@@ -1,0 +1,8 @@
+{
+  "name": "OfCoach",
+  "description": "Une plateforme de coaching sportif complète pour les coachs et les athlètes, permettant le suivi des entraînements, de la nutrition et de la progression.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
