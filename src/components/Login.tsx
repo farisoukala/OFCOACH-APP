@@ -25,7 +25,11 @@ interface LoginProps {
   onNavigateToForgotPassword?: () => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLogin, onNavigateToRegister }) => {
+export const Login: React.FC<LoginProps> = ({
+  onLogin,
+  onNavigateToRegister,
+  onNavigateToForgotPassword,
+}) => {
   const { signInWithEmail } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
