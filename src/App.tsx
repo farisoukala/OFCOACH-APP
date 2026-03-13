@@ -49,13 +49,21 @@ export default function App() {
         />
       );
     }
-    ...
-  };
+
+    switch (currentScreen) {
+      case 'login':
+        return (
+          <Login
+            onLogin={handleLogin}
+            onNavigateToRegister={() => setCurrentScreen('register')}
+            onNavigateToForgotPassword={() => setCurrentScreen('forgot_password')}
+          />
+        );
       case 'register':
         return (
-          <Register 
-            onRegister={() => setCurrentScreen('verify')} 
-            onBack={() => setCurrentScreen('login')} 
+          <Register
+            onRegister={() => setCurrentScreen('verify')}
+            onBack={() => setCurrentScreen('login')}
           />
         );
       case 'verify':
@@ -66,9 +74,7 @@ export default function App() {
           />
         );
       case 'forgot_password':
-        return (
-          <ForgotPassword onBack={() => setCurrentScreen('login')} />
-        );
+        return <ForgotPassword onBack={() => setCurrentScreen('login')} />;
       case 'coach_dashboard':
         return (
           <CoachDashboard
@@ -80,11 +86,11 @@ export default function App() {
         );
       case 'client_list':
         return (
-          <ClientList 
+          <ClientList
             onSelectClient={(id) => {
               setSelectedClientId(id);
               setCurrentScreen('client_profile');
-            }} 
+            }}
             onNavigateToMessages={() => setCurrentScreen('messages')}
             onNavigateToCalendar={() => setCurrentScreen('calendar')}
             onNavigateToDashboard={() => setCurrentScreen('coach_dashboard')}
@@ -95,7 +101,14 @@ export default function App() {
           <ClientProfile
             selectedClientId={selectedClientId}
             onBack={() => setCurrentScreen('client_list')}
-            onNavigateToMessages={selectedClientId ? () => { setMessageOpenWithUserId(selectedClientId); setCurrentScreen('messages'); } : undefined}
+            onNavigateToMessages={
+              selectedClientId
+                ? () => {
+                    setMessageOpenWithUserId(selectedClientId);
+                    setCurrentScreen('messages');
+                  }
+                : undefined
+            }
           />
         );
       case 'athlete_dashboard':
@@ -115,7 +128,9 @@ export default function App() {
             onClearOpenWith={() => setMessageOpenWithUserId(null)}
             onBack={() => setCurrentScreen(role === 'coach' ? 'coach_dashboard' : 'athlete_dashboard')}
             onNavigateToDashboard={() => setCurrentScreen(role === 'coach' ? 'coach_dashboard' : 'athlete_dashboard')}
-            onNavigateToClients={() => setCurrentScreen(role === 'coach' ? 'client_list' : 'athlete_dashboard')}
+            onNavigateToClients={() =>
+              setCurrentScreen(role === 'coach' ? 'client_list' : 'athlete_dashboard')
+            }
             onNavigateToCalendar={() => setCurrentScreen('calendar')}
             onNavigateToSettings={() => setCurrentScreen('settings')}
           />
@@ -137,9 +152,7 @@ export default function App() {
           />
         );
       case 'notifications':
-        return (
-          <Notifications onBack={() => setCurrentScreen(notificationsReturnTo)} />
-        );
+        return <Notifications onBack={() => setCurrentScreen(notificationsReturnTo)} />;
       default:
         return <Login onLogin={handleLogin} onNavigateToRegister={() => setCurrentScreen('register')} />;
     }
