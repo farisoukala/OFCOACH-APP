@@ -20,7 +20,7 @@ export default function App() {
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [messageOpenWithUserId, setMessageOpenWithUserId] = useState<string | null>(null);
   const [notificationsReturnTo, setNotificationsReturnTo] = useState<Screen>('athlete_dashboard');
-  const { role, session, loading } = useAuth();
+  const { role, session, loading, needsPasswordReset, clearPasswordReset } = useAuth();
 
   useEffect(() => {
     if (!session) {
@@ -39,17 +39,18 @@ export default function App() {
 
   const renderScreen = () => {
     if (needsPasswordReset) {
-      return <ResetPassword onDone={() => { setCurrentScreen('login'); handleLogin(); }} />;
+      return (
+        <ResetPassword
+          onDone={() => {
+            clearPasswordReset();
+            setCurrentScreen('login');
+            handleLogin();
+          }}
+        />
+      );
     }
-    switch (currentScreen) {
-      case 'login':
-        return (
-          <Login
-            onLogin={handleLogin}
-            onNavigateToRegister={() => setCurrentScreen('register')}
-            onNavigateToForgotPassword={() => setCurrentScreen('forgot_password')}
-          />
-        );
+    ...
+  };
       case 'register':
         return (
           <Register 
