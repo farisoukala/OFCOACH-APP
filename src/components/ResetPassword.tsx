@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { Lock, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
@@ -53,11 +52,7 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onDone }) => {
             referrerPolicy="no-referrer"
           />
         </div>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative z-20 w-full max-w-[400px] bg-[#161d2b]/60 backdrop-blur-2xl p-8 rounded-3xl border border-white/5 text-center"
-        >
+        <div className="relative z-20 w-full max-w-[400px] bg-[#161d2b]/60 backdrop-blur-2xl p-8 rounded-3xl border border-white/5 text-center">
           <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={32} className="text-green-400" />
           </div>
@@ -66,7 +61,7 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onDone }) => {
           <button type="button" onClick={onDone} className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl transition-colors">
             Se connecter
           </button>
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -82,11 +77,7 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onDone }) => {
           referrerPolicy="no-referrer"
         />
       </div>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-20 w-full max-w-[400px] bg-[#161d2b]/60 backdrop-blur-2xl p-8 rounded-3xl border border-white/5"
-      >
+      <div className="relative z-20 w-full max-w-[400px] bg-[#161d2b]/60 backdrop-blur-2xl p-8 rounded-3xl border border-white/5">
         <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center mb-4">
           <Lock size={24} className="text-primary" />
         </div>
@@ -123,7 +114,7 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ onDone }) => {
             {loading ? 'Enregistrement...' : 'Enregistrer le mot de passe'}
           </button>
         </form>
-      </motion.div>
+      </div>
     </div>
   );
 };

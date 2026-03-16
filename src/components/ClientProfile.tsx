@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { 
   ArrowLeft, 
   Save, 
@@ -400,22 +399,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       </main>
 
       {/* Workout Creation Modal */}
-      <AnimatePresence>
-        {showWorkoutModal && (
+      {showWorkoutModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowWorkoutModal(false)}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              className="relative w-full max-w-lg bg-background-light dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-            >
+            <div role="presentation" onClick={() => setShowWorkoutModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-lg bg-background-light dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="text-xl font-bold tracking-tight">Créer une séance</h3>
                 <button onClick={() => setShowWorkoutModal(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
@@ -521,17 +508,15 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                   {isSaving ? 'Création...' : 'Assigner la séance'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
 
       {/* Nutrition Plan Modal */}
-      <AnimatePresence>
-        {showNutritionModal && (
+      {showNutritionModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !savingNutrition && setShowNutritionModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="relative w-full max-w-lg bg-background-light dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div role="presentation" onClick={() => !savingNutrition && setShowNutritionModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-lg bg-background-light dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="text-xl font-bold tracking-tight">Créer un plan nutritionnel</h3>
                 <button onClick={() => !savingNutrition && setShowNutritionModal(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
@@ -601,10 +586,9 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                   {savingNutrition ? 'Création...' : 'Créer le plan'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
     </div>
   );
 };

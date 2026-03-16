@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
+    "rebuild": "npm run clean && npm run build",
     "lint": "tsc --noEmit",
     "start": "node server.ts"
   },

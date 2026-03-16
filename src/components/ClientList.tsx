@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
   Bell, 
@@ -128,11 +127,12 @@ export const ClientList: React.FC<ClientListProps> = ({
           <div className="text-center py-10 text-slate-500">Aucun client trouvé.</div>
         ) : (
           clients.map((client) => (
-            <motion.div 
+            <div
               key={client.id}
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.99 }}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectClient(client.id)}
+              onKeyDown={(e) => e.key === 'Enter' && onSelectClient(client.id)}
               className="flex items-center gap-4 bg-white dark:bg-[#1c263b] p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800/50 hover:border-primary/30 dark:hover:border-primary/30 transition-all group cursor-pointer"
             >
               <div className="relative">
@@ -157,7 +157,7 @@ export const ClientList: React.FC<ClientListProps> = ({
               <div className="size-9 flex items-center justify-center rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 group-hover:bg-primary group-hover:text-white transition-all">
                 <ChevronRight size={20} />
               </div>
-            </motion.div>
+            </div>
           ))
         )}
       </main>
@@ -170,22 +170,10 @@ export const ClientList: React.FC<ClientListProps> = ({
         <Plus size={28} />
       </button>
 
-      <AnimatePresence>
-        {showLinkModal && (
+      {showLinkModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => !linkLoading && setShowLinkModal(false)}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              className="relative w-full max-w-md bg-white dark:bg-[#1c263b] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800"
-            >
+            <div role="presentation" onClick={() => !linkLoading && setShowLinkModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-md bg-white dark:bg-[#1c263b] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
               <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold flex items-center gap-2">
                   <UserPlus size={22} className="text-primary" />
@@ -226,10 +214,9 @@ export const ClientList: React.FC<ClientListProps> = ({
                   {linkLoading ? 'Liaison...' : 'Lier cet athlète'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
 
       <nav className="sticky bottom-0 z-20 w-full bg-white dark:bg-[#192233] border-t border-slate-200 dark:border-slate-800 pb-safe">
         <div className="flex max-w-2xl mx-auto px-2 py-2">

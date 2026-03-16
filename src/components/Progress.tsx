@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   TrendingDown,
   TrendingUp,
@@ -209,9 +208,8 @@ export const Progress: React.FC = () => {
         ) : (
           <div className="space-y-2">
             {[...logs].reverse().map((log) => (
-              <motion.div
+              <div
                 key={log.id}
-                layout
                 className="bg-white dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -237,7 +235,7 @@ export const Progress: React.FC = () => {
                     <Trash2 size={18} />
                   </button>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
@@ -251,11 +249,10 @@ export const Progress: React.FC = () => {
         <span className="text-sm font-bold">Ajouter une entrée</span>
       </button>
 
-      <AnimatePresence>
-        {showModal && (
+      {showModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !saving && setShowModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+            <div role="presentation" onClick={() => !saving && setShowModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
               <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold">{editingId ? 'Modifier l\'entrée' : 'Nouvelle entrée'}</h3>
                 <button onClick={() => !saving && setShowModal(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -310,10 +307,9 @@ export const Progress: React.FC = () => {
                   {saving ? 'Enregistrement...' : editingId ? 'Enregistrer' : 'Ajouter'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
     </div>
   );
 };

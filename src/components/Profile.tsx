@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   User,
   Settings,
@@ -252,11 +251,10 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
         </button>
       </div>
 
-      <AnimatePresence>
-        {showEditModal && (
+      {showEditModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !saving && setShowEditModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+            <div role="presentation" onClick={() => !saving && setShowEditModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
               <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold">Modifier le profil</h3>
                 <button onClick={() => !saving && setShowEditModal(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -286,16 +284,14 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
                   {saving ? 'Enregistrement...' : 'Enregistrer'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
 
-      <AnimatePresence>
-        {showPasswordModal && (
+      {showPasswordModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !savingPassword && setShowPasswordModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-            <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
+            <div role="presentation" onClick={() => !savingPassword && setShowPasswordModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden">
               <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold">Modifier le mot de passe</h3>
                 <button onClick={() => !savingPassword && setShowPasswordModal(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
@@ -345,10 +341,9 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
                   {savingPassword ? 'Modification...' : 'Modifier le mot de passe'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
     </div>
   );
 };

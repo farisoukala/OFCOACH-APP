@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { 
   Bell, 
   Home,
@@ -11,11 +10,12 @@ import {
   Clock,
   LogOut
 } from 'lucide-react';
-import { Progress } from './Progress';
-import { Nutrition } from './Nutrition';
-import { Workout } from './Workout';
-import { Profile } from './Profile';
 import { fetchWorkoutsByAthlete, fetchNutritionPlan } from '../services/api';
+
+const Progress = lazy(() => import('./Progress').then((m) => ({ default: m.Progress })));
+const Nutrition = lazy(() => import('./Nutrition').then((m) => ({ default: m.Nutrition })));
+const Workout = lazy(() => import('./Workout').then((m) => ({ default: m.Workout })));
+const Profile = lazy(() => import('./Profile').then((m) => ({ default: m.Profile })));
 import { useAuth } from '../context/AuthContext';
 
 type Tab = 'accueil' | 'workout' | 'nutrition' | 'progress' | 'profile';
@@ -61,11 +61,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
     switch (activeTab) {
       case 'accueil':
         return (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-8"
-          >
+          <div className="space-y-8">
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold">Séance du jour</h2>
@@ -134,16 +130,32 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
                 </div>
               </div>
             </section>
-          </motion.div>
+          </div>
         );
       case 'workout':
-        return <Workout />;
+        return (
+          <Suspense fallback={<div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>}>
+            <Workout />
+          </Suspense>
+        );
       case 'nutrition':
-        return <Nutrition />;
+        return (
+          <Suspense fallback={<div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>}>
+            <Nutrition />
+          </Suspense>
+        );
       case 'progress':
-        return <Progress />;
+        return (
+          <Suspense fallback={<div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>}>
+            <Progress />
+          </Suspense>
+        );
       case 'profile':
-        return <Profile />;
+        return (
+          <Suspense fallback={<div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>}>
+            <Profile />
+          </Suspense>
+        );
       default:
         return <div className="text-center py-20 opacity-50">En cours de développement...</div>;
     }
@@ -172,7 +184,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={onNavigateToNotifications}
+              onClick={() => onNavigateToNotifications?.()}
               className="relative p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/20 transition-colors"
             >
               <Bell size={20} />
@@ -209,17 +221,9 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
       </header>
 
       <main className="px-6 py-8 max-w-xl mx-auto">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            {renderContent()}
-          </motion.div>
-        </AnimatePresence>
+        <div key={activeTab}>
+          {renderContent()}
+        </div>
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 bg-background-light dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pt-3 pb-8 z-50 px-2">

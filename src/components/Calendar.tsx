@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -206,10 +205,8 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
         ) : (
           <div className="space-y-3">
             {eventsForDay.map((event) => (
-              <motion.div
+              <div
                 key={event.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
                 className="flex gap-3 items-start group"
               >
                 <div className="flex flex-col items-center gap-1 pt-1 min-w-[48px]">
@@ -237,22 +234,16 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
                     </button>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
       </div>
 
-      <AnimatePresence>
-        {showAddModal && (
+      {showAddModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !saving && setShowAddModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
-            <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              className="relative w-full max-w-md bg-white dark:bg-[#1c263b] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800"
-            >
+            <div role="presentation" onClick={() => !saving && setShowAddModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div className="relative w-full max-w-md bg-white dark:bg-[#1c263b] rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800">
               <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                 <h3 className="text-lg font-bold flex items-center gap-2">
                   <CalendarIcon size={22} className="text-primary" />
@@ -325,10 +316,9 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
                   {saving ? 'Création...' : 'Ajouter l\'événement'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
-      </AnimatePresence>
     </div>
   );
 };

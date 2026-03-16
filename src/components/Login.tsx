@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { 
   Mail, 
   Lock, 
@@ -73,11 +72,7 @@ export const Login: React.FC<LoginProps> = ({
         />
       </div>
 
-      <motion.main 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-20 w-full max-w-[480px] px-6 py-12"
-      >
+      <main className="relative z-20 w-full max-w-[480px] px-6 py-12">
         <div className="flex flex-col items-center mb-10">
            <div className="mb-6 flex justify-center bg-primary/20 p-4 rounded-2xl">
             <div className="text-primary font-extrabold text-4xl tracking-tighter">OfCoach</div>
@@ -179,7 +174,7 @@ export const Login: React.FC<LoginProps> = ({
             </button>
           </p>
         </div>
-      </motion.main>
+      </main>
       
       <div className="fixed bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
     </div>

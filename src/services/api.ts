@@ -64,11 +64,16 @@ export async function updateUserProfile(
 export async function fetchMessages() {
   const { data, error } = await supabase
     .from('messages')
-    .select('*')
-    .order('timestamp', { ascending: false });
+    .select('*');
 
   if (error) throw error;
-  return data || [];
+  const list = Array.isArray(data) ? data : [];
+  list.sort((a, b) => {
+    const ta = (a.created_at || a.timestamp || '').toString();
+    const tb = (b.created_at || b.timestamp || '').toString();
+    return new Date(tb).getTime() - new Date(ta).getTime();
+  });
+  return list;
 }
 
 /** Envoyer un message. */
@@ -102,7 +107,7 @@ export async function fetchWorkoutsByAthlete(athleteId: string) {
     .from('workouts')
     .select('*, exercises(*)')
     .eq('athlete_id', athleteId)
-    .order('date', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -150,13 +155,17 @@ export async function fetchNutritionPlan(athleteId: string) {
   const { data, error } = await supabase
     .from('nutrition_plans')
     .select('*, meals(*)')
-    .eq('athlete_id', athleteId)
-    .order('date', { ascending: false })
-    .limit(1)
-    .single();
+    .eq('athlete_id', athleteId);
 
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-  return data || null;
+  const list = Array.isArray(data) ? data : [];
+  if (list.length === 0) return null;
+  list.sort((a, b) => {
+    const ta = (a.created_at || a.date || '').toString();
+    const tb = (b.created_at || b.date || '').toString();
+    return new Date(tb).getTime() - new Date(ta).getTime();
+  });
+  return list[0] || null;
 }
 
 export interface NutritionPlanInput {
@@ -217,7 +226,7 @@ export async function fetchProgressLogs(athleteId: string) {
     .from('progress_logs')
     .select('*')
     .eq('athlete_id', athleteId)
-    .order('date', { ascending: true });
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
   return data || [];
@@ -271,8 +280,7 @@ export async function fetchCalendarEvents(userId: string) {
     .from('calendar_events')
     .select('*')
     .eq('user_id', userId)
-    .order('date', { ascending: true })
-    .order('time', { ascending: true });
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
   return data;

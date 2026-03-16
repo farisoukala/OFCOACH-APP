@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { motion } from 'motion/react';
 import { ArrowLeft, Bell, CheckCheck } from 'lucide-react';
 import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -119,9 +118,9 @@ export const Notifications: React.FC<NotificationsProps> = ({ onBack }) => {
         ) : (
           <div className="space-y-2">
             {list.map((n) => (
-              <motion.button
+              <button
                 key={n.id}
-                layout
+                type="button"
                 onClick={() => handleRead(n.id)}
                 className={`w-full text-left p-4 rounded-2xl border transition-colors ${
                   n.is_read
@@ -137,7 +136,7 @@ export const Notifications: React.FC<NotificationsProps> = ({ onBack }) => {
                     <p className="text-xs text-slate-500 mt-2">{formatNotifDate(n.created_at)}</p>
                   </div>
                 </div>
-              </motion.button>
+              </button>
             ))}
           </div>
         )}

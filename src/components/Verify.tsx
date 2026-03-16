@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion } from 'motion/react';
 import { 
   ArrowLeft, 
   Mail, 
@@ -25,11 +24,7 @@ export const Verify: React.FC<VerifyProps> = ({ onVerify, onBack }) => {
           </button>
         </div>
 
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md space-y-8 text-center mt-12 md:mt-0"
-        >
+        <div className="w-full max-w-md space-y-8 text-center mt-12 md:mt-0">
           <div className="flex flex-col items-center">
             <div className="relative flex items-center justify-center w-24 h-24 rounded-3xl bg-primary/10 mb-6">
               <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full"></div>
@@ -80,7 +75,7 @@ export const Verify: React.FC<VerifyProps> = ({ onVerify, onBack }) => {
               </div>
             </form>
           </div>
-        </motion.div>
+        </div>
 
         <div className="mt-auto pt-12 opacity-50">
           <div className="flex items-center gap-2">

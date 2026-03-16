@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { motion } from 'motion/react';
 import {
   Dumbbell,
   Clock,

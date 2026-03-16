@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   Search,
   Check,
@@ -17,6 +16,11 @@ import { fetchMessages, sendMessage, fetchUsersByIds, markMessagesAsRead } from 
 import { useAuth } from '../context/AuthContext';
 
 const defaultAvatar = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=150&auto=format&fit=crop';
+
+/** Timestamp du message (colonnes timestamp ou created_at selon le schéma Supabase). */
+function msgTs(m: { timestamp?: string; created_at?: string }): string {
+  return (m.timestamp ?? m.created_at ?? '') as string;
+}
 
 function formatMessageTime(ts: string): string {
   const d = new Date(ts);
@@ -38,22 +42,27 @@ function formatDateLabel(dateStr: string): string {
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+/** Timestamp d'un message (colonne timestamp ou created_at selon le schéma Supabase). */
+function msgTs(m: { timestamp?: string; created_at?: string }): string {
+  return m.timestamp || m.created_at || '';
+}
+
 /** Groupe les messages par jour pour afficher des séparateurs. */
 function groupMessagesByDate(threadMessages: any[]): { dateLabel: string; messages: any[] }[] {
   const groups: { dateLabel: string; messages: any[] }[] = [];
   let currentDate = '';
   let currentGroup: any[] = [];
   threadMessages.forEach((m) => {
-    const d = new Date(m.timestamp).toDateString();
+    const d = new Date(msgTs(m)).toDateString();
     if (d !== currentDate) {
-      if (currentGroup.length) groups.push({ dateLabel: formatDateLabel(currentGroup[0].timestamp), messages: currentGroup });
+      if (currentGroup.length) groups.push({ dateLabel: formatDateLabel(msgTs(currentGroup[0])), messages: currentGroup });
       currentDate = d;
       currentGroup = [m];
     } else {
       currentGroup.push(m);
     }
   });
-  if (currentGroup.length) groups.push({ dateLabel: formatDateLabel(currentGroup[0].timestamp), messages: currentGroup });
+  if (currentGroup.length) groups.push({ dateLabel: formatDateLabel(msgTs(currentGroup[0])), messages: currentGroup });
   return groups;
 }
 
@@ -79,6 +88,15 @@ export const Messages: React.FC<MessagesProps> = ({
   const { appUser } = useAuth();
   const myId = appUser?.id;
 
+  const [messages, setMessages] = useState<any[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, { id: string; name: string | null; avatar: string | null; role?: string }>>({});
+  const [loading, setLoading] = useState(true);
+  const [selectedOtherId, setSelectedOtherId] = useState<string | null>(null);
+  const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const chatBottomRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (openWithUserId && myId && openWithUserId !== myId) {
       setSelectedOtherId(openWithUserId);
@@ -90,15 +108,6 @@ export const Messages: React.FC<MessagesProps> = ({
         .catch(() => {});
     }
   }, [openWithUserId, myId, onClearOpenWith]);
-
-  const [messages, setMessages] = useState<any[]>([]);
-  const [usersMap, setUsersMap] = useState<Record<string, { id: string; name: string | null; avatar: string | null; role?: string }>>({});
-  const [loading, setLoading] = useState(true);
-  const [selectedOtherId, setSelectedOtherId] = useState<string | null>(null);
-  const [inputText, setInputText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const chatBottomRef = useRef<HTMLDivElement>(null);
 
   const loadMessages = useCallback(async () => {
     if (!myId) return;
@@ -126,6 +135,39 @@ export const Messages: React.FC<MessagesProps> = ({
     }
   }, [myId]);
 
+  const conversations = useMemo(() => {
+    if (!myId) return [];
+    const byOther: Record<string, { last: any; unread: number }> = {};
+    messages.forEach((m: any) => {
+      const other = m.sender_id === myId ? m.receiver_id : m.sender_id;
+      if (!byOther[other]) byOther[other] = { last: m, unread: 0 };
+      if (m.receiver_id === myId && !m.is_read) byOther[other].unread++;
+      if (new Date(msgTs(m)) > new Date(msgTs(byOther[other].last))) byOther[other].last = m;
+    });
+    return Object.entries(byOther)
+      .map(([otherId, { last, unread }]) => ({
+        otherId,
+        last,
+        unread,
+        name: usersMap[otherId]?.name ?? 'Utilisateur',
+        avatar: usersMap[otherId]?.avatar ?? null,
+      }))
+      .sort((a, b) => new Date(msgTs(b.last)).getTime() - new Date(msgTs(a.last)).getTime());
+  }, [messages, myId, usersMap]);
+
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations;
+    const q = searchQuery.trim().toLowerCase();
+    return conversations.filter((c) => c.name.toLowerCase().includes(q));
+  }, [conversations, searchQuery]);
+
+  const threadMessages = useMemo(() => {
+    if (!myId || !selectedOtherId) return [];
+    return messages
+      .filter((m: any) => (m.sender_id === myId && m.receiver_id === selectedOtherId) || (m.sender_id === selectedOtherId && m.receiver_id === myId))
+      .sort((a: any, b: any) => new Date(msgTs(a)).getTime() - new Date(msgTs(b)).getTime());
+  }, [messages, myId, selectedOtherId]);
+
   useEffect(() => {
     if (!myId) {
       setLoading(false);
@@ -148,44 +190,11 @@ export const Messages: React.FC<MessagesProps> = ({
     return () => clearInterval(interval);
   }, [selectedOtherId, myId, loadMessages]);
 
-  const conversations = useMemo(() => {
-    if (!myId) return [];
-    const byOther: Record<string, { last: any; unread: number }> = {};
-    messages.forEach((m: any) => {
-      const other = m.sender_id === myId ? m.receiver_id : m.sender_id;
-      if (!byOther[other]) byOther[other] = { last: m, unread: 0 };
-      if (m.receiver_id === myId && !m.is_read) byOther[other].unread++;
-      if (new Date(m.timestamp) > new Date(byOther[other].last.timestamp)) byOther[other].last = m;
-    });
-    return Object.entries(byOther)
-      .map(([otherId, { last, unread }]) => ({
-        otherId,
-        last,
-        unread,
-        name: usersMap[otherId]?.name ?? 'Utilisateur',
-        avatar: usersMap[otherId]?.avatar ?? null,
-      }))
-      .sort((a, b) => new Date(b.last.timestamp).getTime() - new Date(a.last.timestamp).getTime());
-  }, [messages, myId, usersMap]);
-
-  const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
-    const q = searchQuery.trim().toLowerCase();
-    return conversations.filter((c) => c.name.toLowerCase().includes(q));
-  }, [conversations, searchQuery]);
-
   const openConversation = (otherId: string) => {
     setSelectedOtherId(otherId);
     const toMark = messages.filter((m: any) => m.receiver_id === myId && m.sender_id === otherId && !m.is_read).map((m: any) => m.id);
     if (toMark.length > 0) markMessagesAsRead(toMark).then(() => loadMessages());
   };
-
-  const threadMessages = useMemo(() => {
-    if (!myId || !selectedOtherId) return [];
-    return messages
-      .filter((m: any) => (m.sender_id === myId && m.receiver_id === selectedOtherId) || (m.sender_id === selectedOtherId && m.receiver_id === myId))
-      .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  }, [messages, myId, selectedOtherId]);
 
   const handleSend = async () => {
     const text = inputText.trim();
@@ -248,9 +257,8 @@ export const Messages: React.FC<MessagesProps> = ({
         )}
       </header>
 
-      <AnimatePresence mode="wait">
-        {!selectedOtherId ? (
-          <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col min-h-0">
+      {!selectedOtherId ? (
+          <div className="flex-1 flex flex-col min-h-0">
             <div className="px-4 py-3">
               <div className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
@@ -309,9 +317,9 @@ export const Messages: React.FC<MessagesProps> = ({
                 ))
               )}
             </main>
-          </motion.div>
+          </div>
         ) : (
-          <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0">
             <div className="flex-1 overflow-y-auto hide-scrollbar p-4">
               {threadMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -342,7 +350,7 @@ export const Messages: React.FC<MessagesProps> = ({
                           >
                             <p className="text-sm whitespace-pre-wrap break-words">{m.content}</p>
                             <div className={`flex items-center justify-end gap-1 mt-1 ${isMe ? 'text-white/90' : 'text-slate-500'}`}>
-                              <span className="text-[10px]">{formatMessageTime(m.timestamp)}</span>
+                              <span className="text-[10px]">{formatMessageTime(msgTs(m))}</span>
                               {isMe && (m.is_read ? <CheckCheck size={14} className="opacity-90" /> : <Check size={14} className="opacity-80" />)}
                             </div>
                           </div>
@@ -377,9 +385,8 @@ export const Messages: React.FC<MessagesProps> = ({
                 <Send size={20} />
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
 
       {!selectedOtherId && (
         <nav className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe px-2 py-2">

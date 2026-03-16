@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { validateEmail } from '../utils/validation';
@@ -50,11 +49,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
             referrerPolicy="no-referrer"
           />
         </div>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative z-20 w-full max-w-[400px] bg-[#161d2b]/60 backdrop-blur-2xl p-8 rounded-3xl border border-white/5 text-center"
-        >
+        <div className="relative z-20 w-full max-w-[400px] bg-[#161d2b]/60 backdrop-blur-2xl p-8 rounded-3xl border border-white/5 text-center">
           <div className="w-14 h-14 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
             <CheckCircle size={32} className="text-green-400" />
           </div>
@@ -69,7 +64,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
           >
             Retour à la connexion
           </button>
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -85,11 +80,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
           referrerPolicy="no-referrer"
         />
       </div>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative z-20 w-full max-w-[400px]"
-      >
+      <div className="relative z-20 w-full max-w-[400px]">
         <button
           type="button"
           onClick={onBack}
@@ -130,7 +121,7 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
             </button>
           </form>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };
