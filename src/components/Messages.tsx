@@ -200,9 +200,10 @@ export const Messages: React.FC<MessagesProps> = ({
       setInputText('');
       await loadMessages();
       requestAnimationFrame(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }));
-    } catch (err) {
-      console.error(err);
-      alert('Erreur lors de l\'envoi');
+    } catch (err: unknown) {
+      console.error('Send message error:', err);
+      const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message?: string }).message) : '';
+      alert(msg ? `Erreur lors de l'envoi : ${msg}` : 'Erreur lors de l\'envoi');
     } finally {
       setSending(false);
     }
@@ -293,7 +294,7 @@ export const Messages: React.FC<MessagesProps> = ({
                       <div className="flex justify-between items-baseline mb-0.5">
                         <h3 className="font-bold text-base truncate">{conv.name}</h3>
                         <span className={`text-xs ${conv.unread > 0 ? 'font-semibold text-primary' : 'text-slate-500'}`}>
-                          {formatMessageTime(conv.last.timestamp)}
+                          {formatMessageTime(msgTs(conv.last))}
                         </span>
                       </div>
                       <div className="flex justify-between items-center gap-2">
