@@ -154,7 +154,13 @@ export default function App() {
       case 'notifications':
         return <Notifications onBack={() => setCurrentScreen(notificationsReturnTo)} />;
       default:
-        return <Login onLogin={handleLogin} onNavigateToRegister={() => setCurrentScreen('register')} />;
+        return (
+          <Login
+            onLogin={handleLogin}
+            onNavigateToRegister={() => setCurrentScreen('register')}
+            onNavigateToForgotPassword={() => setCurrentScreen('forgot_password')}
+          />
+        );
     }
   };
 
