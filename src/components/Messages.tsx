@@ -42,11 +42,6 @@ function formatDateLabel(dateStr: string): string {
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-/** Timestamp d'un message (colonne timestamp ou created_at selon le schéma Supabase). */
-function msgTs(m: { timestamp?: string; created_at?: string }): string {
-  return m.timestamp || m.created_at || '';
-}
-
 /** Groupe les messages par jour pour afficher des séparateurs. */
 function groupMessagesByDate(threadMessages: any[]): { dateLabel: string; messages: any[] }[] {
   const groups: { dateLabel: string; messages: any[] }[] = [];
