@@ -83,9 +83,11 @@ export const Messages: React.FC<MessagesProps> = ({
     if (openWithUserId && myId && openWithUserId !== myId) {
       setSelectedOtherId(openWithUserId);
       onClearOpenWith?.();
-      fetchUsersByIds([openWithUserId]).then((users) => {
-        if (users.length) setUsersMap((prev) => ({ ...prev, [openWithUserId]: users[0] }));
-      });
+      fetchUsersByIds([openWithUserId])
+        .then((users) => {
+          if (Array.isArray(users) && users.length) setUsersMap((prev) => ({ ...prev, [openWithUserId]: users[0] }));
+        })
+        .catch(() => {});
     }
   }, [openWithUserId, myId, onClearOpenWith]);
 
@@ -102,21 +104,23 @@ export const Messages: React.FC<MessagesProps> = ({
     if (!myId) return;
     try {
       const data = await fetchMessages();
-      setMessages(data);
+      const list = Array.isArray(data) ? data : [];
+      setMessages(list);
       const otherIds = new Set<string>();
-      data.forEach((m: any) => {
+      list.forEach((m: any) => {
         if (m.sender_id !== myId) otherIds.add(m.sender_id);
         if (m.receiver_id !== myId) otherIds.add(m.receiver_id);
       });
       const ids = Array.from(otherIds);
       if (ids.length > 0) {
-        const users = await fetchUsersByIds(ids);
+        const users = await fetchUsersByIds(ids).catch(() => []);
         const map: Record<string, any> = {};
-        users.forEach((u: any) => { map[u.id] = u; });
+        (Array.isArray(users) ? users : []).forEach((u: any) => { if (u?.id) map[u.id] = u; });
         setUsersMap(map);
       } else setUsersMap({});
     } catch (err) {
-      console.error(err);
+      console.error('Messages load error:', err);
+      setMessages([]);
     } finally {
       setLoading(false);
     }
@@ -203,10 +207,22 @@ export const Messages: React.FC<MessagesProps> = ({
   const selectedUser = selectedOtherId ? usersMap[selectedOtherId] : null;
   const selectedName = selectedUser?.name ?? 'Utilisateur';
 
+  if (!appUser?.id) {
+    return (
+      <div className="min-h-screen bg-background-light dark:bg-background-dark flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Chargement des messages...</p>
+        <button type="button" onClick={onBack} className="text-primary text-sm font-medium hover:underline">
+          Retour
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
       <header className="sticky top-0 z-10 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center gap-3">
-        <button onClick={() => selectedOtherId ? setSelectedOtherId(null) : onBack()} className="p-2 -ml-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+        <button type="button" onClick={() => (selectedOtherId ? setSelectedOtherId(null) : onBack?.())} className="p-2 -ml-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
           <ArrowLeft size={24} />
         </button>
         {selectedOtherId ? (
@@ -368,23 +384,23 @@ export const Messages: React.FC<MessagesProps> = ({
       {!selectedOtherId && (
         <nav className="bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe px-2 py-2">
           <div className="flex justify-around items-center max-w-screen-xl mx-auto">
-            <button onClick={onNavigateToDashboard} className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-primary transition-colors">
+            <button type="button" onClick={() => onNavigateToDashboard?.()} className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-primary transition-colors">
               <Grid size={24} />
               <span className="text-[10px] font-medium">Tableau de bord</span>
             </button>
-            <button onClick={onNavigateToClients ?? onNavigateToDashboard} className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-primary transition-colors">
+            <button type="button" onClick={() => (onNavigateToClients ?? onNavigateToDashboard)?.()} className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-primary transition-colors">
               <Users size={24} />
               <span className="text-[10px] font-medium">Clients</span>
             </button>
-            <button className="flex flex-col items-center gap-1 p-2 text-primary">
+            <button type="button" className="flex flex-col items-center gap-1 p-2 text-primary">
               <MessageSquare size={24} fill="currentColor" />
               <span className="text-[10px] font-bold">Messages</span>
             </button>
-            <button onClick={onNavigateToCalendar} className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-primary transition-colors">
+            <button type="button" onClick={() => onNavigateToCalendar?.()} className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-primary transition-colors">
               <Calendar size={24} />
               <span className="text-[10px] font-medium">Planning</span>
             </button>
-            <button onClick={onNavigateToSettings} className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-primary transition-colors">
+            <button type="button" onClick={() => onNavigateToSettings?.()} className="flex flex-col items-center gap-1 p-2 text-slate-400 hover:text-primary transition-colors">
               <Settings size={24} />
               <span className="text-[10px] font-medium">Paramètres</span>
             </button>
