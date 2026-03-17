@@ -180,9 +180,9 @@ export const Messages: React.FC<MessagesProps> = ({
   useEffect(() => {
     if (appUser?.role === 'athlete' && !hasRefreshedProfileForCoach.current) {
       hasRefreshedProfileForCoach.current = true;
-      refreshProfile().then(() => loadMessages());
+      refreshProfile();
     }
-  }, [appUser?.role, refreshProfile, loadMessages]);
+  }, [appUser?.role, refreshProfile]);
 
   /** Scroll vers le bas du fil quand la conversation ou les messages changent. */
   useEffect(() => {
@@ -311,10 +311,14 @@ export const Messages: React.FC<MessagesProps> = ({
                       <p>Pour contacter votre coach, assurez-vous d’être lié à son compte.</p>
                       <button
                         type="button"
-                        onClick={() => refreshProfile().then(() => loadMessages())}
-                        className="text-primary font-medium hover:underline"
+                        onClick={() => {
+                          setLoading(true);
+                          refreshProfile();
+                        }}
+                        disabled={loading}
+                        className="text-primary font-medium hover:underline disabled:opacity-50"
                       >
-                        Rafraîchir pour afficher « Mon coach »
+                        {loading ? 'Chargement…' : 'Rafraîchir pour afficher « Mon coach »'}
                       </button>
                     </div>
                   )}
