@@ -80,7 +80,7 @@ export const Messages: React.FC<MessagesProps> = ({
   onNavigateToCalendar,
   onNavigateToSettings,
 }) => {
-  const { appUser, ensureCurrentUserInDb } = useAuth();
+  const { appUser, ensureCurrentUserInDb, refreshProfile } = useAuth();
   const myId = appUser?.id;
 
   const [messages, setMessages] = useState<any[]>([]);
@@ -91,6 +91,7 @@ export const Messages: React.FC<MessagesProps> = ({
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const hasRefreshedProfileForCoach = useRef(false);
 
   useEffect(() => {
     if (openWithUserId && myId && openWithUserId !== myId) {
@@ -115,6 +116,7 @@ export const Messages: React.FC<MessagesProps> = ({
         if (m.sender_id !== myId) otherIds.add(m.sender_id);
         if (m.receiver_id !== myId) otherIds.add(m.receiver_id);
       });
+      if (appUser?.role === 'athlete' && appUser?.coach_id) otherIds.add(appUser.coach_id);
       const ids = Array.from(otherIds);
       if (ids.length > 0) {
         const users = await fetchUsersByIds(ids).catch(() => []);
@@ -128,7 +130,7 @@ export const Messages: React.FC<MessagesProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [myId]);
+  }, [myId, appUser?.role, appUser?.coach_id]);
 
   const conversations = useMemo(() => {
     if (!myId) return [];
@@ -139,16 +141,19 @@ export const Messages: React.FC<MessagesProps> = ({
       if (m.receiver_id === myId && !m.is_read) byOther[other].unread++;
       if (new Date(msgTs(m)) > new Date(msgTs(byOther[other].last))) byOther[other].last = m;
     });
+    if (appUser?.role === 'athlete' && appUser?.coach_id && !byOther[appUser.coach_id]) {
+      byOther[appUser.coach_id] = { last: { content: '', created_at: '9999-12-31T23:59:59Z', sender_id: appUser.coach_id, receiver_id: myId }, unread: 0 };
+    }
     return Object.entries(byOther)
       .map(([otherId, { last, unread }]) => ({
         otherId,
         last,
         unread,
-        name: usersMap[otherId]?.name ?? 'Utilisateur',
+        name: usersMap[otherId]?.name ?? (otherId === appUser?.coach_id ? 'Mon coach' : 'Utilisateur'),
         avatar: usersMap[otherId]?.avatar ?? null,
       }))
       .sort((a, b) => new Date(msgTs(b.last)).getTime() - new Date(msgTs(a.last)).getTime());
-  }, [messages, myId, usersMap]);
+  }, [messages, myId, usersMap, appUser?.role, appUser?.coach_id]);
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
@@ -170,6 +175,14 @@ export const Messages: React.FC<MessagesProps> = ({
     }
     loadMessages();
   }, [myId, loadMessages]);
+
+  /** Pour les athlètes : rafraîchir le profil une fois au montage pour récupérer coach_id (affichage "Mon coach"). */
+  useEffect(() => {
+    if (appUser?.role === 'athlete' && !hasRefreshedProfileForCoach.current) {
+      hasRefreshedProfileForCoach.current = true;
+      refreshProfile().then(() => loadMessages());
+    }
+  }, [appUser?.role, refreshProfile, loadMessages]);
 
   /** Scroll vers le bas du fil quand la conversation ou les messages changent. */
   useEffect(() => {
@@ -291,7 +304,21 @@ export const Messages: React.FC<MessagesProps> = ({
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                 </div>
               ) : filteredConversations.length === 0 ? (
-                <div className="text-center py-10 text-slate-500">Aucune conversation.</div>
+                <div className="text-center py-10 px-4">
+                  <p className="text-slate-500 mb-4">Aucune conversation.</p>
+                  {appUser?.role === 'athlete' && (
+                    <div className="text-sm text-slate-600 dark:text-slate-400 space-y-2">
+                      <p>Pour contacter votre coach, assurez-vous d’être lié à son compte.</p>
+                      <button
+                        type="button"
+                        onClick={() => refreshProfile().then(() => loadMessages())}
+                        className="text-primary font-medium hover:underline"
+                      >
+                        Rafraîchir pour afficher « Mon coach »
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 filteredConversations.map((conv) => (
                   <div

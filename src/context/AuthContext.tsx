@@ -17,6 +17,7 @@ interface AppUser {
   role: AppUserRole | null;
   avatar: string | null;
   status: string | null;
+  coach_id: string | null;
 }
 
 interface AuthContextValue {
@@ -68,6 +69,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       null,
     avatar: (authUser.user_metadata?.avatar as string | null) ?? null,
     status: null,
+    coach_id: null,
   });
 
   const loadProfile = async (authUser: User | null) => {
@@ -79,7 +81,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, name, email, role, avatar, status')
+        .select('id, name, email, role, avatar, status, coach_id')
         .eq('id', authUser.id)
         .single();
 
@@ -109,6 +111,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           role: data.role as AppUserRole,
           avatar: data.avatar ?? null,
           status: data.status ?? null,
+          coach_id: data.coach_id ?? null,
         });
       }
     } catch {
