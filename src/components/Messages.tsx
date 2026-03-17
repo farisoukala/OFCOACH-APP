@@ -191,12 +191,25 @@ export const Messages: React.FC<MessagesProps> = ({
     if (toMark.length > 0) markMessagesAsRead(toMark).then(() => loadMessages());
   };
 
+  const showSyncError = () => {
+    alert(
+      'Votre profil n\'est pas synchronisé avec la base de données.\n\n' +
+      '1. Ouvrez le projet Supabase utilisé par cette app (celui dont l\'URL est dans les variables d\'environnement Vercel).\n' +
+      '2. Allez dans SQL Editor et exécutez tout le script "supabase_migration_sync_auth_users.sql".\n' +
+      '3. Rafraîchissez cette page puis réessayez.'
+    );
+  };
+
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || !myId || !selectedOtherId || sending) return;
     setSending(true);
     try {
-      await ensureCurrentUserInDb();
+      const ok = await ensureCurrentUserInDb();
+      if (!ok) {
+        showSyncError();
+        return;
+      }
       await sendMessage(myId, selectedOtherId, text);
       setInputText('');
       await loadMessages();
@@ -206,15 +219,8 @@ export const Messages: React.FC<MessagesProps> = ({
       const obj = err && typeof err === 'object' ? (err as { message?: string; code?: string; details?: string }) : {};
       const msg = [obj.message, obj.details].filter(Boolean).join(' ');
       const isFkError = obj.code === '23503' || /messages_sender_id_fkey|foreign key constraint/i.test(msg);
-      if (isFkError) {
-        alert(
-          'Votre profil n\'est pas encore synchronisé avec la base de données. ' +
-          'L’administrateur doit exécuter le script "supabase_migration_sync_auth_users.sql" dans Supabase (SQL Editor). ' +
-          'Puis rafraîchissez cette page et réessayez.'
-        );
-      } else {
-        alert(msg ? `Erreur lors de l'envoi : ${msg}` : 'Erreur lors de l\'envoi');
-      }
+      if (isFkError) showSyncError();
+      else alert(msg ? `Erreur lors de l'envoi : ${msg}` : 'Erreur lors de l\'envoi');
     } finally {
       setSending(false);
     }
