@@ -10,11 +10,16 @@ GRANT INSERT ON public.users TO authenticated;
 GRANT SELECT ON public.users TO authenticated;
 
 -- 1) Insérer dans public.users tous les utilisateurs Auth qui n'y sont pas encore
+--    (email rendu unique : si déjà pris par un autre user, on met id@auth.local)
 INSERT INTO public.users (id, name, email, role, avatar, status)
 SELECT
   au.id::text,
   COALESCE(au.raw_user_meta_data->>'name', au.raw_user_meta_data->>'full_name', split_part(COALESCE(au.email, ''), '@', 1), 'Utilisateur'),
-  COALESCE(NULLIF(trim(au.email), ''), au.id::text || '@auth.local'),
+  CASE
+    WHEN trim(COALESCE(au.email, '')) = '' THEN au.id::text || '@auth.local'
+    WHEN EXISTS (SELECT 1 FROM public.users u WHERE u.email = trim(au.email) AND u.id <> au.id::text) THEN au.id::text || '@auth.local'
+    ELSE trim(au.email)
+  END,
   COALESCE(au.raw_user_meta_data->>'role', 'athlete'),
   au.raw_user_meta_data->>'avatar',
   NULL
