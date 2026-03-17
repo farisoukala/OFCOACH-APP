@@ -174,15 +174,17 @@ export const Messages: React.FC<MessagesProps> = ({
       return;
     }
     loadMessages();
+    const timeout = setTimeout(() => setLoading(false), 12000);
+    return () => clearTimeout(timeout);
   }, [myId, loadMessages]);
 
-  /** Pour les athlètes : rafraîchir le profil une fois au montage pour récupérer coach_id (affichage "Mon coach"). */
+  /** Pour les athlètes : rafraîchir le profil après le premier chargement pour récupérer coach_id (évite de bloquer l’affichage). */
   useEffect(() => {
-    if (appUser?.role === 'athlete' && !hasRefreshedProfileForCoach.current) {
-      hasRefreshedProfileForCoach.current = true;
-      refreshProfile();
-    }
-  }, [appUser?.role, refreshProfile]);
+    if (appUser?.role !== 'athlete' || !appUser?.id || hasRefreshedProfileForCoach.current) return;
+    hasRefreshedProfileForCoach.current = true;
+    const t = setTimeout(() => refreshProfile(), 800);
+    return () => clearTimeout(t);
+  }, [appUser?.role, appUser?.id, refreshProfile]);
 
   /** Scroll vers le bas du fil quand la conversation ou les messages changent. */
   useEffect(() => {
