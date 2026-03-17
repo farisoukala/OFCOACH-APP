@@ -94,8 +94,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               name: fallback.name ?? fallback.email.split('@')[0],
               email: authUser.email ?? '',
               role: fallback.role ?? 'athlete',
-              avatar: fallback.avatar ?? null,
-              status: null,
             },
             { onConflict: 'id' }
           );
@@ -246,8 +244,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           name: fallback.name ?? fallback.email.split('@')[0],
           email: authUser.email ?? '',
           role: fallback.role ?? 'athlete',
-          avatar: fallback.avatar ?? null,
-          status: null,
         },
         { onConflict: 'id' }
       );

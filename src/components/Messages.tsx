@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { fetchMessages, sendMessage, fetchUsersByIds, markMessagesAsRead } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
 const defaultAvatar = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=150&auto=format&fit=crop';
 
@@ -90,8 +91,19 @@ export const Messages: React.FC<MessagesProps> = ({
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [athleteCoachId, setAthleteCoachId] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const hasRefreshedProfileForCoach = useRef(false);
+
+  const coachId = appUser?.role === 'athlete' ? (appUser?.coach_id ?? athleteCoachId) : null;
+
+  /** Pour les athlètes : charger coach_id depuis la table users (au cas où le profil global ne l’a pas). */
+  useEffect(() => {
+    if (appUser?.role !== 'athlete' || !myId) return;
+    supabase.from('users').select('coach_id').eq('id', myId).single()
+      .then(({ data }) => setAthleteCoachId(data?.coach_id ?? null))
+      .catch(() => setAthleteCoachId(null));
+  }, [appUser?.role, myId]);
 
   useEffect(() => {
     if (openWithUserId && myId && openWithUserId !== myId) {
@@ -116,7 +128,7 @@ export const Messages: React.FC<MessagesProps> = ({
         if (m.sender_id !== myId) otherIds.add(m.sender_id);
         if (m.receiver_id !== myId) otherIds.add(m.receiver_id);
       });
-      if (appUser?.role === 'athlete' && appUser?.coach_id) otherIds.add(appUser.coach_id);
+      if (appUser?.role === 'athlete' && coachId) otherIds.add(coachId);
       const ids = Array.from(otherIds);
       if (ids.length > 0) {
         const users = await fetchUsersByIds(ids).catch(() => []);
@@ -130,7 +142,7 @@ export const Messages: React.FC<MessagesProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [myId, appUser?.role, appUser?.coach_id]);
+  }, [myId, appUser?.role, coachId]);
 
   const conversations = useMemo(() => {
     if (!myId) return [];
@@ -141,19 +153,19 @@ export const Messages: React.FC<MessagesProps> = ({
       if (m.receiver_id === myId && !m.is_read) byOther[other].unread++;
       if (new Date(msgTs(m)) > new Date(msgTs(byOther[other].last))) byOther[other].last = m;
     });
-    if (appUser?.role === 'athlete' && appUser?.coach_id && !byOther[appUser.coach_id]) {
-      byOther[appUser.coach_id] = { last: { content: '', created_at: '9999-12-31T23:59:59Z', sender_id: appUser.coach_id, receiver_id: myId }, unread: 0 };
+    if (appUser?.role === 'athlete' && coachId && !byOther[coachId]) {
+      byOther[coachId] = { last: { content: '', created_at: '9999-12-31T23:59:59Z', sender_id: coachId, receiver_id: myId }, unread: 0 };
     }
     return Object.entries(byOther)
       .map(([otherId, { last, unread }]) => ({
         otherId,
         last,
         unread,
-        name: usersMap[otherId]?.name ?? (otherId === appUser?.coach_id ? 'Mon coach' : 'Utilisateur'),
+        name: usersMap[otherId]?.name ?? (otherId === coachId ? 'Mon coach' : 'Utilisateur'),
         avatar: usersMap[otherId]?.avatar ?? null,
       }))
       .sort((a, b) => new Date(msgTs(b.last)).getTime() - new Date(msgTs(a.last)).getTime());
-  }, [messages, myId, usersMap, appUser?.role, appUser?.coach_id]);
+  }, [messages, myId, usersMap, appUser?.role, coachId]);
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
