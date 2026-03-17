@@ -80,7 +80,7 @@ export const Messages: React.FC<MessagesProps> = ({
   onNavigateToCalendar,
   onNavigateToSettings,
 }) => {
-  const { appUser } = useAuth();
+  const { appUser, ensureCurrentUserInDb } = useAuth();
   const myId = appUser?.id;
 
   const [messages, setMessages] = useState<any[]>([]);
@@ -196,14 +196,25 @@ export const Messages: React.FC<MessagesProps> = ({
     if (!text || !myId || !selectedOtherId || sending) return;
     setSending(true);
     try {
+      await ensureCurrentUserInDb();
       await sendMessage(myId, selectedOtherId, text);
       setInputText('');
       await loadMessages();
       requestAnimationFrame(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }));
     } catch (err: unknown) {
       console.error('Send message error:', err);
-      const msg = err && typeof err === 'object' && 'message' in err ? String((err as { message?: string }).message) : '';
-      alert(msg ? `Erreur lors de l'envoi : ${msg}` : 'Erreur lors de l\'envoi');
+      const obj = err && typeof err === 'object' ? (err as { message?: string; code?: string; details?: string }) : {};
+      const msg = [obj.message, obj.details].filter(Boolean).join(' ');
+      const isFkError = obj.code === '23503' || /messages_sender_id_fkey|foreign key constraint/i.test(msg);
+      if (isFkError) {
+        alert(
+          'Votre profil n\'est pas encore synchronisé avec la base de données. ' +
+          'L’administrateur doit exécuter le script "supabase_migration_sync_auth_users.sql" dans Supabase (SQL Editor). ' +
+          'Puis rafraîchissez cette page et réessayez.'
+        );
+      } else {
+        alert(msg ? `Erreur lors de l'envoi : ${msg}` : 'Erreur lors de l\'envoi');
+      }
     } finally {
       setSending(false);
     }

@@ -41,6 +41,8 @@ interface AuthContextValue {
   }) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /** À appeler avant d'envoyer un message : garantit que l'utilisateur courant a une ligne dans public.users. */
+  ensureCurrentUserInDb: () => Promise<void>;
   updatePassword: (currentPassword: string, newPassword: string) => Promise<{ error: string | null }>;
   resetPasswordForEmail: (email: string) => Promise<{ error: string | null }>;
   needsPasswordReset: boolean;
@@ -82,7 +84,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .single();
 
       if (error || !data) {
-        setAppUser(buildAppUserFromAuth(authUser));
+        const fallback = buildAppUserFromAuth(authUser);
+        try {
+          await supabase.from('users').upsert(
+            {
+              id: authUser.id,
+              name: fallback.name ?? fallback.email.split('@')[0],
+              email: authUser.email ?? '',
+              role: fallback.role ?? 'athlete',
+              avatar: fallback.avatar ?? null,
+              status: null,
+            },
+            { onConflict: 'id' }
+          );
+        } catch {
+          // Ignore si RLS ou autre empêche l'upsert (ex. migration non exécutée)
+        }
+        setAppUser(fallback);
       } else {
         setAppUser({
           id: data.id,
@@ -214,6 +232,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await loadProfile(user);
   };
 
+  const ensureCurrentUserInDb = async () => {
+    const authUser = user ?? (await supabase.auth.getUser()).data.user ?? null;
+    if (!authUser) return;
+    const fallback = buildAppUserFromAuth(authUser);
+    try {
+      await supabase.from('users').upsert(
+        {
+          id: authUser.id,
+          name: fallback.name ?? fallback.email.split('@')[0],
+          email: authUser.email ?? '',
+          role: fallback.role ?? 'athlete',
+          avatar: fallback.avatar ?? null,
+          status: null,
+        },
+        { onConflict: 'id' }
+      );
+    } catch {
+      // RLS peut bloquer si la migration n'est pas exécutée
+    }
+  };
+
   const updatePassword = async (currentPassword: string, newPassword: string): Promise<{ error: string | null }> => {
     const email = user?.email;
     if (!email) return { error: 'Session invalide.' };
@@ -253,6 +292,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signUpWithEmail,
     signOut,
     refreshProfile,
+    ensureCurrentUserInDb,
     updatePassword,
     resetPasswordForEmail,
     needsPasswordReset,

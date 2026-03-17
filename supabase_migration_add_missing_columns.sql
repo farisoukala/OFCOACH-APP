@@ -12,6 +12,9 @@ ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS timestamp TIMESTAMPTZ DEFAU
 -- Remplir timestamp à partir de created_at pour les lignes existantes (si timestamp vient d'être créé)
 UPDATE public.messages SET timestamp = created_at WHERE timestamp IS NULL AND created_at IS NOT NULL;
 
+-- Messages : colonne is_read (lu/non lu) pour l'envoi et la lecture
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false;
+
 -- Nutrition_plans : ajouter date si absent
 ALTER TABLE public.nutrition_plans ADD COLUMN IF NOT EXISTS date TEXT;
 
