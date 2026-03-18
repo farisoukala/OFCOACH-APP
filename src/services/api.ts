@@ -295,6 +295,71 @@ export async function deleteProgressLog(logId: string) {
   if (error) throw error;
 }
 
+export type BodyMeasurementSnapshot = {
+  id: string;
+  athlete_id: string;
+  snapshot_date: string; // YYYY-MM-DD
+  taille_cm?: number | null;
+  tour_poitrine_cm?: number | null;
+  tour_ventre_cm?: number | null;
+  tour_hanche_cm?: number | null;
+  tour_bras_cm?: number | null;
+  tour_epaule_cm?: number | null;
+  tour_mollet_cm?: number | null;
+  created_at?: string;
+};
+
+export type BodyMeasurementSnapshotInput = {
+  snapshot_date: string; // YYYY-MM-DD
+  taille_cm?: number | null;
+  tour_poitrine_cm?: number | null;
+  tour_ventre_cm?: number | null;
+  tour_hanche_cm?: number | null;
+  tour_bras_cm?: number | null;
+  tour_epaule_cm?: number | null;
+  tour_mollet_cm?: number | null;
+};
+
+export async function fetchBodyMeasurementSnapshots(athleteId: string) {
+  const { data, error } = await supabase
+    .from('body_measurement_snapshots')
+    .select('*')
+    .eq('athlete_id', athleteId)
+    .order('snapshot_date', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as BodyMeasurementSnapshot[];
+}
+
+/**
+ * Upsert du relevé du jour (ou d’une date) pour construire un historique.
+ * Si la table n’existe pas encore en base, on échoue silencieusement (pour éviter de bloquer l’UI).
+ */
+export async function upsertBodyMeasurementSnapshot(
+  athleteId: string,
+  input: BodyMeasurementSnapshotInput
+) {
+  const row = {
+    athlete_id: athleteId,
+    snapshot_date: input.snapshot_date,
+    taille_cm: input.taille_cm ?? null,
+    tour_poitrine_cm: input.tour_poitrine_cm ?? null,
+    tour_ventre_cm: input.tour_ventre_cm ?? null,
+    tour_hanche_cm: input.tour_hanche_cm ?? null,
+    tour_bras_cm: input.tour_bras_cm ?? null,
+    tour_epaule_cm: input.tour_epaule_cm ?? null,
+    tour_mollet_cm: input.tour_mollet_cm ?? null,
+  };
+
+  const { error } = await supabase
+    .from('body_measurement_snapshots')
+    .upsert([row], { onConflict: 'athlete_id,snapshot_date' });
+
+  // Table non créée / schéma pas à jour : on ne bloque pas la sauvegarde des mensurations actuelles.
+  if (error && error.code === '42P01') return;
+  if (error) throw error;
+}
+
 export async function fetchCalendarEvents(userId: string) {
   const { data, error } = await supabase
     .from('calendar_events')

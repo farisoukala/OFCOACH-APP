@@ -17,24 +17,39 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-import { fetchProgressLogs, createProgressLog, updateProgressLog, deleteProgressLog } from '../services/api';
+import { fetchBodyMeasurementSnapshots, fetchProgressLogs, createProgressLog, updateProgressLog, deleteProgressLog } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 export const Progress: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
+  const [measurementLogs, setMeasurementLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ date: '', weight: '', body_fat: '', notes: '' });
+  const [mode, setMode] = useState<'poids' | 'mensurations'>('poids');
+  const [metric, setMetric] = useState<
+    | 'taille_cm'
+    | 'tour_poitrine_cm'
+    | 'tour_ventre_cm'
+    | 'tour_hanche_cm'
+    | 'tour_bras_cm'
+    | 'tour_epaule_cm'
+    | 'tour_mollet_cm'
+  >('tour_ventre_cm');
   const { appUser } = useAuth();
   const athleteId = appUser?.id;
 
   const loadLogs = useCallback(async () => {
     if (!athleteId) return;
     try {
-      const data = await fetchProgressLogs(athleteId);
-      setLogs(data);
+      const [weightLogs, measLogs] = await Promise.all([
+        fetchProgressLogs(athleteId),
+        fetchBodyMeasurementSnapshots(athleteId),
+      ]);
+      setLogs(weightLogs);
+      setMeasurementLogs(measLogs);
     } catch (err) {
       console.error(err);
     } finally {
@@ -123,12 +138,38 @@ export const Progress: React.FC = () => {
     ? (latestLog.weight - firstLog.weight).toFixed(1)
     : '0';
 
-  const chartData = logs
+  const measurementChartData = measurementLogs
+    .filter((l) => l?.[metric] != null)
+    .map((log) => ({
+      date: log.snapshot_date ? new Date(log.snapshot_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '',
+      value: log[metric],
+    }));
+
+  const weightChartData = logs
     .filter((l) => l.weight != null)
     .map((log) => ({
       date: log.date ? new Date(log.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '',
-      weight: log.weight,
+      value: log.weight,
     }));
+
+  const activeChartData = mode === 'poids' ? weightChartData : measurementChartData;
+
+  const latestMeas = measurementLogs.length ? measurementLogs[measurementLogs.length - 1] : null;
+  const firstMeas = measurementLogs.length ? measurementLogs[0] : null;
+  const measDiff =
+    latestMeas?.[metric] != null && firstMeas?.[metric] != null
+      ? Number(latestMeas[metric]) - Number(firstMeas[metric])
+      : null;
+
+  const metricLabel: Record<string, string> = {
+    taille_cm: 'Taille',
+    tour_poitrine_cm: 'Poitrine',
+    tour_ventre_cm: 'Ventre',
+    tour_hanche_cm: 'Hanches',
+    tour_bras_cm: 'Bras',
+    tour_epaule_cm: 'Épaule',
+    tour_mollet_cm: 'Mollets',
+  };
 
   if (loading) {
     return (
@@ -140,27 +181,80 @@ export const Progress: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-24">
+      <section className="px-1">
+        <div className="inline-flex bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-xl p-1 gap-1">
+          <button
+            onClick={() => setMode('poids')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${mode === 'poids' ? 'bg-primary text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            type="button"
+          >
+            Poids
+          </button>
+          <button
+            onClick={() => setMode('mensurations')}
+            className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${mode === 'mensurations' ? 'bg-primary text-white' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            type="button"
+          >
+            Mensurations
+          </button>
+        </div>
+      </section>
+
       <section>
         <div className="bg-white dark:bg-slate-900/50 rounded-xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm relative">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Poids actuel</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                {mode === 'poids' ? 'Poids actuel' : `Dernier relevé • ${metricLabel[metric]}`}
+              </p>
               <h3 className="text-3xl font-extrabold text-slate-900 dark:text-slate-100">
-                {latestLog?.weight != null ? latestLog.weight : '--'} <span className="text-lg font-medium opacity-60">kg</span>
+                {mode === 'poids'
+                  ? (latestLog?.weight != null ? latestLog.weight : '--')
+                  : (latestMeas?.[metric] != null ? latestMeas[metric] : '--')}{' '}
+                <span className="text-lg font-medium opacity-60">{mode === 'poids' ? 'kg' : 'cm'}</span>
               </h3>
             </div>
-            {logs.length >= 2 && (
-              <div className={`flex items-center gap-1 ${parseFloat(weightDiff) <= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'} px-2 py-1 rounded-lg text-xs font-bold`}>
-                {parseFloat(weightDiff) <= 0 ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
-                {weightDiff} kg
-              </div>
+            {mode === 'poids' ? (
+              logs.length >= 2 && (
+                <div className={`flex items-center gap-1 ${parseFloat(weightDiff) <= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'} px-2 py-1 rounded-lg text-xs font-bold`}>
+                  {parseFloat(weightDiff) <= 0 ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
+                  {weightDiff} kg
+                </div>
+              )
+            ) : (
+              measurementLogs.length >= 2 &&
+              measDiff != null && (
+                <div className={`flex items-center gap-1 ${measDiff <= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'} px-2 py-1 rounded-lg text-xs font-bold`}>
+                  {measDiff <= 0 ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
+                  {measDiff.toFixed(1)} cm
+                </div>
+              )
             )}
           </div>
 
-          {chartData.length >= 2 ? (
+          {mode === 'mensurations' && (
+            <div className="mb-3">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Mesure</label>
+              <select
+                value={metric}
+                onChange={(e) => setMetric(e.target.value as any)}
+                className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary text-sm font-semibold"
+              >
+                <option value="tour_ventre_cm">Tour de ventre</option>
+                <option value="tour_hanche_cm">Tour de hanches</option>
+                <option value="tour_poitrine_cm">Tour de poitrine</option>
+                <option value="tour_bras_cm">Tour de bras</option>
+                <option value="tour_epaule_cm">Tour d’épaule</option>
+                <option value="tour_mollet_cm">Tour de mollets</option>
+                <option value="taille_cm">Taille</option>
+              </select>
+            </div>
+          )}
+
+          {activeChartData.length >= 2 ? (
             <div className="h-48 w-full mt-4">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
+                <AreaChart data={activeChartData}>
                   <defs>
                     <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#1152D4" stopOpacity={0.3} />
@@ -171,11 +265,11 @@ export const Progress: React.FC = () => {
                   <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} dy={10} />
                   <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
                   <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                  <Area type="monotone" dataKey="weight" stroke="#1152D4" strokeWidth={3} fillOpacity={1} fill="url(#colorWeight)" />
+                  <Area type="monotone" dataKey="value" stroke="#1152D4" strokeWidth={3} fillOpacity={1} fill="url(#colorWeight)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-          ) : chartData.length === 1 ? (
+          ) : activeChartData.length === 1 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">Ajoutez d'autres entrées pour voir la courbe.</p>
           ) : (
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">Aucune donnée. Ajoutez une entrée pour commencer.</p>

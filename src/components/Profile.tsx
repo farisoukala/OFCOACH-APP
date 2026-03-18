@@ -12,7 +12,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { fetchClientById, updateUserProfile } from '../services/api';
+import { fetchClientById, updateUserProfile, upsertBodyMeasurementSnapshot } from '../services/api';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import { validatePassword, validatePasswordMatch, validateRequired } from '../utils/validation';
 
@@ -91,7 +91,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
     if (!appUser?.id) return;
     setSaving(true);
     try {
-      await updateUserProfile(appUser.id, {
+      const payload = {
         taille_cm: tailleCm ? Number(tailleCm) : null,
         tour_poitrine_cm: tourPoitrineCm ? Number(tourPoitrineCm) : null,
         tour_ventre_cm: tourVentreCm ? Number(tourVentreCm) : null,
@@ -99,18 +99,19 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
         tour_bras_cm: tourBrasCm ? Number(tourBrasCm) : null,
         tour_epaule_cm: tourEpauleCm ? Number(tourEpauleCm) : null,
         tour_mollet_cm: tourMolletCm ? Number(tourMolletCm) : null,
-      });
+      };
+
+      await updateUserProfile(appUser.id, payload);
+
+      // Historiser un relevé du jour (sert aux courbes de progrès en cm)
+      const today = new Date().toISOString().split('T')[0];
+      await upsertBodyMeasurementSnapshot(appUser.id, { snapshot_date: today, ...payload });
+
       setProfile((p) =>
         p
           ? ({
               ...p,
-              taille_cm: tailleCm ? Number(tailleCm) : null,
-              tour_poitrine_cm: tourPoitrineCm ? Number(tourPoitrineCm) : null,
-              tour_ventre_cm: tourVentreCm ? Number(tourVentreCm) : null,
-              tour_hanche_cm: tourHancheCm ? Number(tourHancheCm) : null,
-              tour_bras_cm: tourBrasCm ? Number(tourBrasCm) : null,
-              tour_epaule_cm: tourEpauleCm ? Number(tourEpauleCm) : null,
-              tour_mollet_cm: tourMolletCm ? Number(tourMolletCm) : null,
+              ...payload,
             } as any)
           : p
       );
