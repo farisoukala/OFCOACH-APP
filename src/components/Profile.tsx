@@ -39,6 +39,13 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordFieldErrors, setPasswordFieldErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
 
+  const [tailleCm, setTailleCm] = useState<string>('');
+  const [tourPoitrineCm, setTourPoitrineCm] = useState<string>('');
+  const [tourVentreCm, setTourVentreCm] = useState<string>('');
+  const [tourHancheCm, setTourHancheCm] = useState<string>('');
+  const [tourBrasCm, setTourBrasCm] = useState<string>('');
+  const [tourEpauleCm, setTourEpauleCm] = useState<string>('');
+  const [tourMolletCm, setTourMolletCm] = useState<string>('');
   useEffect(() => {
     if (!appUser?.id) {
       setLoading(false);
@@ -49,6 +56,13 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
         setProfile(data);
         setEditName(data.name ?? '');
         setEditAvatar(data.avatar ?? '');
+        setTailleCm(data.taille_cm != null ? String(data.taille_cm) : '');
+        setTourPoitrineCm(data.tour_poitrine_cm != null ? String(data.tour_poitrine_cm) : '');
+        setTourVentreCm(data.tour_ventre_cm != null ? String(data.tour_ventre_cm) : '');
+        setTourHancheCm(data.tour_hanche_cm != null ? String(data.tour_hanche_cm) : '');
+        setTourBrasCm(data.tour_bras_cm != null ? String(data.tour_bras_cm) : '');
+        setTourEpauleCm(data.tour_epaule_cm != null ? String(data.tour_epaule_cm) : '');
+        setTourMolletCm(data.tour_mollet_cm != null ? String(data.tour_mollet_cm) : '');
       })
       .catch(() => setProfile(null))
       .finally(() => setLoading(false));
@@ -68,6 +82,42 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
     } catch (e) {
       console.error(e);
       alert('Erreur lors de l\'enregistrement.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveMeasurements = async () => {
+    if (!appUser?.id) return;
+    setSaving(true);
+    try {
+      await updateUserProfile(appUser.id, {
+        taille_cm: tailleCm ? Number(tailleCm) : null,
+        tour_poitrine_cm: tourPoitrineCm ? Number(tourPoitrineCm) : null,
+        tour_ventre_cm: tourVentreCm ? Number(tourVentreCm) : null,
+        tour_hanche_cm: tourHancheCm ? Number(tourHancheCm) : null,
+        tour_bras_cm: tourBrasCm ? Number(tourBrasCm) : null,
+        tour_epaule_cm: tourEpauleCm ? Number(tourEpauleCm) : null,
+        tour_mollet_cm: tourMolletCm ? Number(tourMolletCm) : null,
+      });
+      setProfile((p) =>
+        p
+          ? ({
+              ...p,
+              taille_cm: tailleCm ? Number(tailleCm) : null,
+              tour_poitrine_cm: tourPoitrineCm ? Number(tourPoitrineCm) : null,
+              tour_ventre_cm: tourVentreCm ? Number(tourVentreCm) : null,
+              tour_hanche_cm: tourHancheCm ? Number(tourHancheCm) : null,
+              tour_bras_cm: tourBrasCm ? Number(tourBrasCm) : null,
+              tour_epaule_cm: tourEpauleCm ? Number(tourEpauleCm) : null,
+              tour_mollet_cm: tourMolletCm ? Number(tourMolletCm) : null,
+            } as any)
+          : p
+      );
+      await refreshProfile();
+    } catch (e) {
+      console.error(e);
+      alert('Erreur lors de la sauvegarde des mensurations.');
     } finally {
       setSaving(false);
     }
@@ -181,6 +231,110 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
             </p>
           </div>
         ))}
+      </div>
+
+      {/* Mensurations */}
+      <div className="px-4 space-y-3">
+        <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-2">
+          Mensurations
+        </h3>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs text-slate-500 dark:text-slate-400">Taille (cm)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={tailleCm}
+              onChange={(e) => setTailleCm(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="ex : 170"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-slate-500 dark:text-slate-400">Tour de poitrine (cm)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={tourPoitrineCm}
+              onChange={(e) => setTourPoitrineCm(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="ex : 95"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-slate-500 dark:text-slate-400">Tour de ventre (cm)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={tourVentreCm}
+              onChange={(e) => setTourVentreCm(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="ex : 80"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-slate-500 dark:text-slate-400">Tour de hanches (cm)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={tourHancheCm}
+              onChange={(e) => setTourHancheCm(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="ex : 95"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-slate-500 dark:text-slate-400">Tour de bras (cm)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={tourBrasCm}
+              onChange={(e) => setTourBrasCm(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="ex : 32"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-slate-500 dark:text-slate-400">Tour d’épaule (cm)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={tourEpauleCm}
+              onChange={(e) => setTourEpauleCm(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="ex : 110"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs text-slate-500 dark:text-slate-400">Tour de mollet (cm)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              value={tourMolletCm}
+              onChange={(e) => setTourMolletCm(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              placeholder="ex : 38"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            onClick={handleSaveMeasurements}
+            disabled={saving}
+            className="inline-flex items-center px-4 py-2 rounded-xl bg-primary text-white text-sm font-medium disabled:opacity-50 hover:opacity-90 transition"
+          >
+            {saving ? 'Enregistrement…' : 'Enregistrer les mensurations'}
+          </button>
+        </div>
       </div>
 
       <div className="px-4 space-y-2">

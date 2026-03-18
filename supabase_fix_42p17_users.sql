@@ -1,11 +1,10 @@
 -- ============================================================
--- OfCoach – Permettre à un athlète de lire le profil de son coach
--- (nécessaire pour afficher "Mon coach" dans Messages et envoyer un message au coach)
--- Utilise une fonction SECURITY DEFINER pour éviter la récursion infinie des politiques RLS.
+-- Corriger définitivement l'erreur 42P17 sur POST users?on_conflict=id
+-- (récursion dans une politique RLS sur public.users)
 -- Exécuter dans Supabase → SQL Editor
 -- ============================================================
 
--- Fonction qui retourne le coach_id de l'utilisateur connecté (sans déclencher les politiques RLS)
+-- 1) S'assurer que la fonction existe (évite récursion dans la politique "read own coach")
 CREATE OR REPLACE FUNCTION public.get_my_coach_id()
 RETURNS uuid
 LANGUAGE sql
@@ -18,10 +17,11 @@ AS $$
   LIMIT 1;
 $$;
 
--- Supprimer l’ancienne politique (celle qui provoquait la récursion)
+-- 2) Supprimer l'ancienne politique récursive et recréer la bonne
 DROP POLICY IF EXISTS "Users read own coach (athletes)" ON public.users;
-
--- Nouvelle politique : lecture autorisée si la ligne est le coach de l’utilisateur connecté
 CREATE POLICY "Users read own coach (athletes)"
   ON public.users FOR SELECT TO authenticated
   USING ((id::uuid) = public.get_my_coach_id());
+
+-- 3) Vérifier que la politique INSERT ne lit pas la table users (elle ne doit pas)
+--    "Users can insert own row" : WITH CHECK ((id)::uuid = auth.uid()) → OK, pas de lecture

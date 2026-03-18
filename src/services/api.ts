@@ -48,17 +48,37 @@ export async function updateUserProfile(
     age?: number | null;
     objectives?: string | null;
     medical_risks?: string | null;
+    taille_cm?: number | null;
+    tour_poitrine_cm?: number | null;
+    tour_ventre_cm?: number | null;
+    tour_hanche_cm?: number | null;
+    tour_bras_cm?: number | null;
+    tour_epaule_cm?: number | null;
+    tour_mollet_cm?: number | null;
   }
 ) {
-  const { data, error } = await supabase
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const isSelf =
+    session?.user?.id != null && session.user.id === userId;
+
+  // Mise à jour de son propre profil : RPC pour éviter 42P17 (RLS récursif sur UPDATE users)
+  if (isSelf) {
+    const { error } = await supabase.rpc('patch_my_user_profile', {
+      p_data: profile as Record<string, unknown>,
+    });
+    if (error) throw error;
+    return profile as Record<string, unknown>;
+  }
+
+  const { error } = await supabase
     .from('users')
     .update(profile)
-    .eq('id', userId)
-    .select()
-    .single();
+    .eq('id', userId);
 
   if (error) throw error;
-  return data;
+  return profile as Record<string, unknown>;
 }
 
 export async function fetchMessages() {
