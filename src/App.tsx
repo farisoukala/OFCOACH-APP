@@ -82,6 +82,10 @@ export default function App() {
             onNavigateToMessages={() => setCurrentScreen('messages')}
             onNavigateToCalendar={() => setCurrentScreen('calendar')}
             onNavigateToSettings={() => setCurrentScreen('settings')}
+            onOpenClientProfile={(id) => {
+              setSelectedClientId(id);
+              setCurrentScreen('client_profile');
+            }}
           />
         );
       case 'client_list':

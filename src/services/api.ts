@@ -72,11 +72,11 @@ export async function updateUserProfile(
     return profile as Record<string, unknown>;
   }
 
-  const { error } = await supabase
-    .from('users')
-    .update(profile)
-    .eq('id', userId);
-
+  // Coach met à jour un athlète : RPC pour éviter 42P17 (pas de PATCH direct sur users)
+  const { error } = await supabase.rpc('patch_athlete_profile_as_coach', {
+    p_athlete_id: userId,
+    p_data: profile as Record<string, unknown>,
+  });
   if (error) throw error;
   return profile as Record<string, unknown>;
 }

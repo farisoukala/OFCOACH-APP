@@ -36,11 +36,26 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [client, setClient] = useState<{
     id: string; name: string; email?: string; avatar?: string | null; status?: string | null;
     weight_kg?: number | null; height_cm?: number | null; age?: number | null; objectives?: string | null; medical_risks?: string | null;
+    taille_cm?: number | null; tour_poitrine_cm?: number | null; tour_ventre_cm?: number | null; tour_hanche_cm?: number | null;
+    tour_bras_cm?: number | null; tour_epaule_cm?: number | null; tour_mollet_cm?: number | null;
   } | null>(null);
   const [clientLoading, setClientLoading] = useState(true);
   const [editProfile, setEditProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState({ weight_kg: '', height_cm: '', age: '', objectives: '', medical_risks: '' });
+  const [profileForm, setProfileForm] = useState({
+    weight_kg: '',
+    height_cm: '',
+    age: '',
+    objectives: '',
+    medical_risks: '',
+    taille_cm: '',
+    tour_poitrine_cm: '',
+    tour_ventre_cm: '',
+    tour_hanche_cm: '',
+    tour_bras_cm: '',
+    tour_epaule_cm: '',
+    tour_mollet_cm: '',
+  });
   const [nutritionPlan, setNutritionPlan] = useState<any>(null);
   const [showNutritionModal, setShowNutritionModal] = useState(false);
   const [savingNutrition, setSavingNutrition] = useState(false);
@@ -66,6 +81,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
           age: data.age != null ? String(data.age) : '',
           objectives: data.objectives ?? '',
           medical_risks: data.medical_risks ?? '',
+          taille_cm: data.taille_cm != null ? String(data.taille_cm) : '',
+          tour_poitrine_cm: data.tour_poitrine_cm != null ? String(data.tour_poitrine_cm) : '',
+          tour_ventre_cm: data.tour_ventre_cm != null ? String(data.tour_ventre_cm) : '',
+          tour_hanche_cm: data.tour_hanche_cm != null ? String(data.tour_hanche_cm) : '',
+          tour_bras_cm: data.tour_bras_cm != null ? String(data.tour_bras_cm) : '',
+          tour_epaule_cm: data.tour_epaule_cm != null ? String(data.tour_epaule_cm) : '',
+          tour_mollet_cm: data.tour_mollet_cm != null ? String(data.tour_mollet_cm) : '',
         });
       })
       .catch(() => setClient(null))
@@ -86,14 +108,22 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     if (!selectedClientId || !client) return;
     setSavingProfile(true);
     try {
-      const updated = await updateUserProfile(selectedClientId, {
+      await updateUserProfile(selectedClientId, {
         weight_kg: profileForm.weight_kg ? parseFloat(profileForm.weight_kg) : null,
         height_cm: profileForm.height_cm ? parseFloat(profileForm.height_cm) : null,
         age: profileForm.age ? parseInt(profileForm.age, 10) : null,
         objectives: profileForm.objectives || null,
         medical_risks: profileForm.medical_risks || null,
+        taille_cm: profileForm.taille_cm ? parseFloat(profileForm.taille_cm) : null,
+        tour_poitrine_cm: profileForm.tour_poitrine_cm ? parseFloat(profileForm.tour_poitrine_cm) : null,
+        tour_ventre_cm: profileForm.tour_ventre_cm ? parseFloat(profileForm.tour_ventre_cm) : null,
+        tour_hanche_cm: profileForm.tour_hanche_cm ? parseFloat(profileForm.tour_hanche_cm) : null,
+        tour_bras_cm: profileForm.tour_bras_cm ? parseFloat(profileForm.tour_bras_cm) : null,
+        tour_epaule_cm: profileForm.tour_epaule_cm ? parseFloat(profileForm.tour_epaule_cm) : null,
+        tour_mollet_cm: profileForm.tour_mollet_cm ? parseFloat(profileForm.tour_mollet_cm) : null,
       });
-      setClient(updated);
+      const fresh = await fetchClientById(selectedClientId);
+      setClient(fresh);
       setEditProfile(false);
     } catch (e) {
       console.error(e);
@@ -274,6 +304,76 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
           </div>
           <h2 className="mt-4 text-2xl font-bold">{client.name}</h2>
           <p className="text-slate-500 dark:text-slate-400 font-medium">Athlète{client.status ? ` • ${client.status}` : ''}</p>
+        </section>
+
+        <section
+          id="mensurations-athlete"
+          className="rounded-2xl border-2 border-primary/30 bg-primary/5 dark:bg-primary/10 p-4 space-y-3"
+        >
+          <div className="flex items-center gap-2">
+            <Activity className="text-primary shrink-0" size={22} />
+            <div>
+              <h3 className="text-base font-bold">Mensurations</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                {editProfile
+                  ? 'Modifiez les valeurs puis appuyez sur « Sauvegarder » en haut'
+                  : 'Cliquez sur « Modifier le profil » pour les éditer'}
+              </p>
+            </div>
+          </div>
+          {editProfile ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+              {(
+                [
+                  ['taille_cm', 'Taille (cm)'],
+                  ['tour_poitrine_cm', 'Poitrine (cm)'],
+                  ['tour_ventre_cm', 'Ventre (cm)'],
+                  ['tour_hanche_cm', 'Hanches (cm)'],
+                  ['tour_bras_cm', 'Bras (cm)'],
+                  ['tour_epaule_cm', 'Épaule (cm)'],
+                  ['tour_mollet_cm', 'Mollets (cm)'],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key} className="space-y-1">
+                  <label className="text-[9px] font-bold uppercase text-slate-500 dark:text-slate-400">{label}</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={profileForm[key]}
+                    onChange={(e) => setProfileForm((f) => ({ ...f, [key]: e.target.value }))}
+                    className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 px-2 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary"
+                    placeholder="—"
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+              {[
+                { label: 'Taille', value: client.taille_cm, unit: 'cm' },
+                { label: 'Poitrine', value: client.tour_poitrine_cm, unit: 'cm' },
+                { label: 'Ventre', value: client.tour_ventre_cm, unit: 'cm' },
+                { label: 'Hanches', value: client.tour_hanche_cm, unit: 'cm' },
+                { label: 'Bras', value: client.tour_bras_cm, unit: 'cm' },
+                { label: 'Épaule', value: client.tour_epaule_cm, unit: 'cm' },
+                { label: 'Mollets', value: client.tour_mollet_cm, unit: 'cm' },
+              ].map((m, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5 text-center"
+                >
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 block">
+                    {m.label}
+                  </span>
+                  <p className="text-sm font-bold mt-0.5">
+                    {m.value != null && m.value !== '' ? m.value : '—'}
+                    <span className="text-[10px] font-normal text-slate-500 ml-0.5">{m.unit}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="grid grid-cols-3 gap-4">

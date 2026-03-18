@@ -233,7 +233,15 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
         ))}
       </div>
 
-      {/* Mensurations */}
+      {/* Mensurations (athlètes uniquement ; le coach les modifie sur la fiche du client) */}
+      {appUser?.role === 'coach' ? (
+        <div className="px-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 rounded-2xl p-4">
+            Les <strong>mensurations</strong> des athlètes se modifient depuis leur fiche :{' '}
+            <strong>Clients</strong> → choisir l’athlète → <strong>Modifier le profil</strong>.
+          </p>
+        </div>
+      ) : (
       <div className="px-4 space-y-3">
         <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-2">
           Mensurations
@@ -336,6 +344,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
           </button>
         </div>
       </div>
+      )}
 
       <div className="px-4 space-y-2">
         <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider px-2 mb-2">Compte</h3>

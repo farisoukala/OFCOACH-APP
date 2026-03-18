@@ -21,6 +21,8 @@ interface CoachDashboardProps {
   onNavigateToMessages: () => void;
   onNavigateToCalendar: () => void;
   onNavigateToSettings?: () => void;
+  /** Ouvre le profil détaillé d’un athlète (mensurations, etc.) */
+  onOpenClientProfile?: (clientId: string) => void;
 }
 
 export const CoachDashboard: React.FC<CoachDashboardProps> = ({
@@ -153,6 +155,10 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
             recentClients.map((client) => (
               <div 
                 key={client.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => onOpenClientProfile?.(client.id)}
+                onKeyDown={(e) => e.key === 'Enter' && onOpenClientProfile?.(client.id)}
                 className="flex items-center p-4 bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/30 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer group"
               >
                 <div className="relative">
