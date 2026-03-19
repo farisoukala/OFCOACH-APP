@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { createWorkout, fetchClientById, updateUserProfile, fetchNutritionPlan, createNutritionPlan, addMealToPlan, createNotification } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { upsertBodyMeasurementSnapshot } from '../services/api';
 
 interface ClientProfileProps {
   onBack: () => void;
@@ -64,6 +65,8 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [workoutFormError, setWorkoutFormError] = useState<string | null>(null);
   const [nutritionFormError, setNutritionFormError] = useState<string | null>(null);
   const { appUser } = useAuth();
+  const todayIso = new Date().toISOString().split('T')[0];
+  const [measurementDate, setMeasurementDate] = useState<string>(todayIso);
 
   useEffect(() => {
     if (!selectedClientId) {
@@ -122,6 +125,23 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         tour_epaule_cm: profileForm.tour_epaule_cm ? parseFloat(profileForm.tour_epaule_cm) : null,
         tour_mollet_cm: profileForm.tour_mollet_cm ? parseFloat(profileForm.tour_mollet_cm) : null,
       });
+
+      // Historiser un relevé CM daté (sert aux courbes "Mensurations" côté Progrès)
+      // On utilise la date choisie dans l’écran du coach.
+      if (!measurementDate) {
+        throw new Error('Date du relevé invalide.');
+      }
+      await upsertBodyMeasurementSnapshot(selectedClientId, {
+        snapshot_date: measurementDate,
+        taille_cm: profileForm.taille_cm ? parseFloat(profileForm.taille_cm) : null,
+        tour_poitrine_cm: profileForm.tour_poitrine_cm ? parseFloat(profileForm.tour_poitrine_cm) : null,
+        tour_ventre_cm: profileForm.tour_ventre_cm ? parseFloat(profileForm.tour_ventre_cm) : null,
+        tour_hanche_cm: profileForm.tour_hanche_cm ? parseFloat(profileForm.tour_hanche_cm) : null,
+        tour_bras_cm: profileForm.tour_bras_cm ? parseFloat(profileForm.tour_bras_cm) : null,
+        tour_epaule_cm: profileForm.tour_epaule_cm ? parseFloat(profileForm.tour_epaule_cm) : null,
+        tour_mollet_cm: profileForm.tour_mollet_cm ? parseFloat(profileForm.tour_mollet_cm) : null,
+      });
+
       const fresh = await fetchClientById(selectedClientId);
       setClient(fresh);
       setEditProfile(false);
@@ -322,31 +342,45 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
             </div>
           </div>
           {editProfile ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
-              {(
-                [
-                  ['taille_cm', 'Taille (cm)'],
-                  ['tour_poitrine_cm', 'Poitrine (cm)'],
-                  ['tour_ventre_cm', 'Ventre (cm)'],
-                  ['tour_hanche_cm', 'Hanches (cm)'],
-                  ['tour_bras_cm', 'Bras (cm)'],
-                  ['tour_epaule_cm', 'Épaule (cm)'],
-                  ['tour_mollet_cm', 'Mollets (cm)'],
-                ] as const
-              ).map(([key, label]) => (
-                <div key={key} className="space-y-1">
-                  <label className="text-[9px] font-bold uppercase text-slate-500 dark:text-slate-400">{label}</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    inputMode="decimal"
-                    value={profileForm[key]}
-                    onChange={(e) => setProfileForm((f) => ({ ...f, [key]: e.target.value }))}
-                    className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 px-2 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="—"
-                  />
-                </div>
-              ))}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                  Date du relevé
+                </label>
+                <input
+                  type="date"
+                  value={measurementDate}
+                  onChange={(e) => setMeasurementDate(e.target.value)}
+                  className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 px-2 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                {(
+                  [
+                    ['taille_cm', 'Taille (cm)'],
+                    ['tour_poitrine_cm', 'Poitrine (cm)'],
+                    ['tour_ventre_cm', 'Ventre (cm)'],
+                    ['tour_hanche_cm', 'Hanches (cm)'],
+                    ['tour_bras_cm', 'Bras (cm)'],
+                    ['tour_epaule_cm', 'Épaule (cm)'],
+                    ['tour_mollet_cm', 'Mollets (cm)'],
+                  ] as const
+                ).map(([key, label]) => (
+                  <div key={key} className="space-y-1">
+                    <label className="text-[9px] font-bold uppercase text-slate-500 dark:text-slate-400">{label}</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      inputMode="decimal"
+                      value={profileForm[key]}
+                      onChange={(e) => setProfileForm((f) => ({ ...f, [key]: e.target.value }))}
+                      className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600 px-2 py-2 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="—"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
