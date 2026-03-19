@@ -59,9 +59,12 @@ export const Workout: React.FC = () => {
     try {
       await updateWorkout(workoutId, { status: 'completed' });
       await loadWorkouts();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Erreur lors de la mise à jour.');
+      const msg =
+        (err?.code ? `[${err.code}] ` : '') +
+        (err?.message || err?.error_description || err?.hint || 'Erreur lors de la mise à jour.');
+      alert(msg);
     } finally {
       setMarkingId(null);
     }

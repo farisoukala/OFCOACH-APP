@@ -134,6 +134,20 @@ export async function fetchWorkoutsByAthlete(athleteId: string) {
 }
 
 export async function updateWorkout(workoutId: string, updates: { status?: string }) {
+  // Cas principal côté athlète: terminer sa séance.
+  // On passe par RPC pour éviter les blocages RLS UPDATE selon les environnements.
+  if (updates.status === 'completed') {
+    const { error } = await supabase.rpc('mark_workout_completed', {
+      p_workout_id: workoutId,
+    });
+    if (!error) {
+      // garder une réponse compatible pour l'appelant
+      return { id: workoutId, status: 'completed' } as any;
+    }
+    // fallback: on tente la route classique si la RPC n'existe pas encore
+    if (error.code !== '42883') throw error; // undefined_function
+  }
+
   const { data, error } = await supabase
     .from('workouts')
     .update(updates)
