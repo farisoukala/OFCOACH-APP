@@ -214,7 +214,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     setIsSaving(true);
     try {
       await createWorkout({
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         athlete_id: selectedClientId,
         coach_id: appUser.id,
         title: workoutTitle,
@@ -235,9 +235,14 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       setExercises([]);
       setWorkoutFormError(null);
       alert('Séance créée avec succès !');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating workout:', error);
-      setWorkoutFormError('Erreur lors de la création de la séance.');
+      const msg =
+        error?.message ||
+        error?.error_description ||
+        error?.error?.message ||
+        'Erreur lors de la création de la séance.';
+      setWorkoutFormError(msg);
     } finally {
       setIsSaving(false);
     }
