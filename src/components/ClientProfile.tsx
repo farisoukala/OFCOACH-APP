@@ -225,6 +225,14 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     }
     setSavingNutrition(true);
     try {
+      const toIntOrNull = (v: any) => {
+        if (v === null || v === undefined) return null;
+        const s = String(v).trim();
+        if (!s) return null;
+        const n = parseInt(s, 10);
+        return Number.isNaN(n) ? null : n;
+      };
+
       const plan = await createNutritionPlan(selectedClientId, appUser.id, {
         title: nutritionForm.title || 'Plan du jour',
         date: nutritionForm.date || new Date().toISOString().split('T')[0],
@@ -236,10 +244,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       for (const meal of mealsToAdd) {
         await addMealToPlan(plan.id, {
           name: meal.name.trim(),
-          calories: meal.calories ? parseInt(meal.calories, 10) : null,
-          protein: meal.protein ? parseInt(meal.protein, 10) : null,
-          carbs: meal.carbs ? parseInt(meal.carbs, 10) : null,
-          fat: meal.fat ? parseInt(meal.fat, 10) : null,
+          calories: toIntOrNull(meal.calories),
+          protein: toIntOrNull(meal.protein),
+          carbs: toIntOrNull(meal.carbs),
+          fat: toIntOrNull(meal.fat),
           time: meal.time || null,
         });
       }
@@ -256,7 +264,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       alert('Plan nutritionnel créé.');
     } catch (e) {
       console.error(e);
-      setNutritionFormError('Erreur lors de la création du plan.');
+      const anyErr = e as any;
+      const msg =
+        anyErr?.message ||
+        anyErr?.error_description ||
+        anyErr?.error?.message ||
+        'Erreur lors de la création du plan.';
+      setNutritionFormError(msg);
     } finally {
       setSavingNutrition(false);
     }
