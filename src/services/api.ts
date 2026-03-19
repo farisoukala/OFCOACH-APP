@@ -158,7 +158,14 @@ export async function createWorkout(workoutData: any) {
 
   if (exercises && exercises.length > 0) {
     const exercisesWithWorkoutId = exercises.map((ex: any) => ({
-      ...ex,
+      // La table exercises.id attend un UUID.
+      // On ne réutilise pas l'id UI local (souvent Date.now()).
+      id: crypto.randomUUID(),
+      name: ex.name ?? '',
+      sets: ex.sets ?? null,
+      reps: ex.reps ?? null,
+      weight: ex.weight ?? null,
+      rest_time: ex.rest_time ?? null,
       workout_id: workoutResult.id,
     }));
     const { error: exercisesError } = await supabase
