@@ -3,6 +3,7 @@ import {
   ArrowLeft, 
   Save, 
   TrendingUp, 
+  TrendingDown,
   AlertTriangle, 
   Target, 
   Camera,
@@ -16,9 +17,10 @@ import {
   MessageSquare,
   Utensils
 } from 'lucide-react';
-import { createWorkout, fetchClientById, updateUserProfile, fetchNutritionPlan, createNutritionPlan, addMealToPlan, createNotification } from '../services/api';
+import { createWorkout, fetchClientById, updateUserProfile, fetchNutritionPlan, createNutritionPlan, addMealToPlan, createNotification, fetchBodyMeasurementSnapshots } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { upsertBodyMeasurementSnapshot } from '../services/api';
+import { AreaChart, Area, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
 
 interface ClientProfileProps {
   onBack: () => void;
@@ -64,6 +66,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [nutritionMeals, setNutritionMeals] = useState<{ name: string; calories: string; protein: string; carbs: string; fat: string; time: string }[]>([{ name: '', calories: '', protein: '', carbs: '', fat: '', time: '12:00' }]);
   const [workoutFormError, setWorkoutFormError] = useState<string | null>(null);
   const [nutritionFormError, setNutritionFormError] = useState<string | null>(null);
+  const [measurementSnapshots, setMeasurementSnapshots] = useState<any[]>([]);
+  const [measurementMetric, setMeasurementMetric] = useState<
+    'taille_cm' | 'tour_poitrine_cm' | 'tour_ventre_cm' | 'tour_hanche_cm' | 'tour_bras_cm' | 'tour_epaule_cm' | 'tour_mollet_cm'
+  >('tour_ventre_cm');
   const { appUser } = useAuth();
   const todayIso = new Date().toISOString().split('T')[0];
   const [measurementDate, setMeasurementDate] = useState<string>(todayIso);
@@ -107,6 +113,16 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       .catch(() => setNutritionPlan(null));
   }, [selectedClientId]);
 
+  useEffect(() => {
+    if (!selectedClientId || appUser?.role !== 'coach') {
+      setMeasurementSnapshots([]);
+      return;
+    }
+    fetchBodyMeasurementSnapshots(selectedClientId)
+      .then(setMeasurementSnapshots)
+      .catch(() => setMeasurementSnapshots([]));
+  }, [selectedClientId, appUser?.role]);
+
   const handleSaveProfile = async () => {
     if (!selectedClientId || !client) return;
     setSavingProfile(true);
@@ -144,6 +160,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
 
       const fresh = await fetchClientById(selectedClientId);
       setClient(fresh);
+      setMeasurementSnapshots(await fetchBodyMeasurementSnapshots(selectedClientId));
       setEditProfile(false);
     } catch (e) {
       console.error(e);
@@ -152,6 +169,27 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       setSavingProfile(false);
     }
   };
+
+  const metricLabel: Record<string, string> = {
+    taille_cm: 'Taille',
+    tour_poitrine_cm: 'Poitrine',
+    tour_ventre_cm: 'Ventre',
+    tour_hanche_cm: 'Hanches',
+    tour_bras_cm: 'Bras',
+    tour_epaule_cm: 'Épaule',
+    tour_mollet_cm: 'Mollets',
+  };
+  const measurementSeries = measurementSnapshots
+    .filter((s) => s?.[measurementMetric] != null)
+    .map((s) => ({
+      date: s.snapshot_date
+        ? new Date(s.snapshot_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+        : '',
+      value: Number(s[measurementMetric]),
+    }));
+  const firstM = measurementSeries.length ? measurementSeries[0].value : null;
+  const lastM = measurementSeries.length ? measurementSeries[measurementSeries.length - 1].value : null;
+  const deltaM = firstM != null && lastM != null ? Number((lastM - firstM).toFixed(1)) : null;
 
   const addExercise = () => {
     setExercises([...exercises, { id: Date.now().toString(), name: '', sets: 3, reps: '12', weight: 0, rest_time: '60s' }]);
@@ -422,6 +460,68 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
               ))}
             </div>
           )}
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold">Evolution mensurations</h3>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Courbe historique des releves en cm
+              </p>
+            </div>
+            {deltaM != null && (
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${deltaM <= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+                {deltaM <= 0 ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
+                {deltaM.toFixed(1)} cm
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Mesure</label>
+            <select
+              value={measurementMetric}
+              onChange={(e) => setMeasurementMetric(e.target.value as any)}
+              className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary text-sm"
+            >
+              <option value="tour_ventre_cm">Tour de ventre</option>
+              <option value="tour_hanche_cm">Tour de hanches</option>
+              <option value="tour_poitrine_cm">Tour de poitrine</option>
+              <option value="tour_bras_cm">Tour de bras</option>
+              <option value="tour_epaule_cm">Tour d'epaule</option>
+              <option value="tour_mollet_cm">Tour de mollets</option>
+              <option value="taille_cm">Taille</option>
+            </select>
+          </div>
+          <div className="bg-white dark:bg-slate-900/40 rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
+            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2">
+              Dernier releve • {metricLabel[measurementMetric]} :{' '}
+              <span className="font-extrabold">{lastM != null ? `${lastM} cm` : '--'}</span>
+            </p>
+            {measurementSeries.length >= 2 ? (
+              <div className="h-40 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={measurementSeries}>
+                    <defs>
+                      <linearGradient id="clientMeasColor" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#1152D4" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#1152D4" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-200 dark:stroke-slate-700" />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                    <YAxis hide />
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} />
+                    <Area type="monotone" dataKey="value" stroke="#1152D4" strokeWidth={3} fill="url(#clientMeasColor)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Pas assez de releves pour tracer une courbe.
+              </p>
+            )}
+          </div>
         </section>
 
         <section className="grid grid-cols-3 gap-4">
