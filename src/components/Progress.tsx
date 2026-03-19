@@ -66,6 +66,13 @@ export const Progress: React.FC = () => {
   }, [athleteId, loadLogs]);
 
   const openAdd = () => {
+    // Pour l’instant, les points de la courbe (cm) sont créés uniquement
+    // depuis "Réglages -> Profil" quand tu cliques "Enregistrer les mensurations".
+    // L’écran Progrès mensurations n’a pas encore de modal d’ajout dédiée.
+    if (mode === 'mensurations') {
+      alert("Pour créer un relevé en cm : Réglages -> Profil -> Mensurations -> « Enregistrer les mensurations ».");
+      return;
+    }
     setEditingId(null);
     setForm({
       date: new Date().toISOString().split('T')[0],
@@ -272,12 +279,16 @@ export const Progress: React.FC = () => {
           ) : activeChartData.length === 1 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">Ajoutez d'autres entrées pour voir la courbe.</p>
           ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">Aucune donnée. Ajoutez une entrée pour commencer.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-4">
+              {mode === 'mensurations'
+                ? "Aucune donnée pour cette mesure. Pour créer le 1er relevé : Réglages -> Profil -> Mensurations -> « Enregistrer les mensurations »."
+                : 'Aucune donnée. Ajoutez une entrée pour commencer.'}
+            </p>
           )}
         </div>
       </section>
 
-      {latestLog?.body_fat != null && (
+      {mode === 'poids' && latestLog?.body_fat != null && (
         <section>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800 text-center">
@@ -288,6 +299,7 @@ export const Progress: React.FC = () => {
         </section>
       )}
 
+      {mode === 'poids' && (
       <section>
         <div className="flex justify-between items-center mb-4 px-1">
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Historique</h2>
@@ -334,7 +346,9 @@ export const Progress: React.FC = () => {
           </div>
         )}
       </section>
+      )}
 
+      {mode === 'poids' && (
       <button
         onClick={openAdd}
         className="w-full py-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:border-primary/50 hover:text-primary transition-all"
@@ -342,6 +356,7 @@ export const Progress: React.FC = () => {
         <Plus size={20} />
         <span className="text-sm font-bold">Ajouter une entrée</span>
       </button>
+      )}
 
       {showModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
