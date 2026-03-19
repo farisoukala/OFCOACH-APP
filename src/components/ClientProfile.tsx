@@ -30,6 +30,22 @@ interface ClientProfileProps {
 
 const defaultAvatar = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop';
 
+const formatSupabaseError = (err: any, fallback: string) => {
+  if (!err) return fallback;
+  const parts: string[] = [];
+  if (err.code) parts.push(`[${err.code}]`);
+  if (err.message) parts.push(err.message);
+  if (err.details) parts.push(`details: ${err.details}`);
+  if (err.hint) parts.push(`hint: ${err.hint}`);
+  if (parts.length > 0) return parts.join(' ');
+
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return fallback;
+  }
+};
+
 export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedClientId, onNavigateToMessages }) => {
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [workoutTitle, setWorkoutTitle] = useState('');
@@ -237,11 +253,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       alert('Séance créée avec succès !');
     } catch (error: any) {
       console.error('Error creating workout:', error);
-      const msg =
-        error?.message ||
-        error?.error_description ||
-        error?.error?.message ||
-        'Erreur lors de la création de la séance.';
+      const msg = formatSupabaseError(error, 'Erreur lors de la création de la séance.');
       setWorkoutFormError(msg);
     } finally {
       setIsSaving(false);
@@ -305,14 +317,9 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       setShowNutritionModal(false);
       setNutritionFormError(null);
       alert('Plan nutritionnel créé.');
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      const anyErr = e as any;
-      const msg =
-        anyErr?.message ||
-        anyErr?.error_description ||
-        anyErr?.error?.message ||
-        'Erreur lors de la création du plan.';
+      const msg = formatSupabaseError(e, 'Erreur lors de la création du plan.');
       setNutritionFormError(msg);
     } finally {
       setSavingNutrition(false);
