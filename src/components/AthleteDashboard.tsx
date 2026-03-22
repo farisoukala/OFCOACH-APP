@@ -8,9 +8,10 @@ import {
   MessageCircle,
   User,
   Clock,
-  LogOut
+  LogOut,
+  Calendar,
 } from 'lucide-react';
-import { fetchWorkoutsByAthlete, fetchNutritionPlan } from '../services/api';
+import { fetchWorkoutsByAthlete, fetchNutritionPlan, fetchAthleteAppointments } from '../services/api';
 import { pickFeaturedWorkout, localTodayIso } from '../lib/workoutPlanning';
 
 const Progress = lazy(() => import('./Progress').then((m) => ({ default: m.Progress })));
@@ -24,12 +25,18 @@ type Tab = 'accueil' | 'workout' | 'nutrition' | 'progress' | 'profile';
 interface AthleteDashboardProps {
   onNavigateToMessages: () => void;
   onNavigateToNotifications?: () => void;
+  onNavigateToCalendar?: () => void;
 }
 
-export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateToMessages, onNavigateToNotifications }) => {
+export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
+  onNavigateToMessages,
+  onNavigateToNotifications,
+  onNavigateToCalendar,
+}) => {
   const [activeTab, setActiveTab] = useState<Tab>('accueil');
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [nutrition, setNutrition] = useState<any>(null);
+  const [coachAppointments, setCoachAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { appUser, signOut } = useAuth();
   const athleteId = appUser?.id;
@@ -43,12 +50,14 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
         return;
       }
       try {
-        const [workoutsData, nutritionData] = await Promise.all([
+        const [workoutsData, nutritionData, appts] = await Promise.all([
           fetchWorkoutsByAthlete(athleteId),
-          fetchNutritionPlan(athleteId)
+          fetchNutritionPlan(athleteId),
+          fetchAthleteAppointments(athleteId).catch(() => [] as any[]),
         ]);
         setWorkouts(workoutsData);
         setNutrition(nutritionData);
+        setCoachAppointments(appts || []);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
@@ -60,6 +69,13 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
 
   const featuredWorkout = pickFeaturedWorkout(workouts);
   const todayIso = localTodayIso();
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const nextCoachAppt = [...coachAppointments]
+    .filter((a) => a?.starts_at && !Number.isNaN(new Date(a.starts_at).getTime()))
+    .filter((a) => new Date(a.starts_at) >= startOfToday)
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())[0];
 
   const renderContent = () => {
     switch (activeTab) {
@@ -120,6 +136,52 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
                 </div>
               )}
             </section>
+
+            {onNavigateToCalendar && (
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <Calendar className="text-primary" size={20} />
+                    Rendez-vous coach
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToCalendar()}
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    Planning complet
+                  </button>
+                </div>
+                {nextCoachAppt ? (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToCalendar()}
+                    className="w-full text-left bg-sky-500/10 dark:bg-sky-500/15 border border-sky-500/25 rounded-2xl p-4 space-y-1 hover:bg-sky-500/15 transition-colors"
+                  >
+                    <p className="text-xs font-bold uppercase text-sky-600 dark:text-sky-400">Prochain créneau</p>
+                    <p className="font-bold text-slate-900 dark:text-slate-100">{nextCoachAppt.title}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {new Date(nextCoachAppt.starts_at).toLocaleString('fr-FR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                      {nextCoachAppt.duration_minutes != null ? ` · ${nextCoachAppt.duration_minutes} min` : ''}
+                    </p>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToCalendar()}
+                    className="w-full py-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-500 text-sm font-medium hover:border-primary/50 hover:text-primary transition-colors"
+                  >
+                    Aucun rendez-vous à venir — ouvre le planning pour tes événements perso
+                  </button>
+                )}
+              </section>
+            )}
 
             <section>
               <h2 className="text-lg font-bold mb-4">Statistiques récentes</h2>
@@ -203,6 +265,16 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {onNavigateToCalendar && (
+              <button
+                type="button"
+                onClick={() => onNavigateToCalendar()}
+                className="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/20 transition-colors"
+                title="Planning"
+              >
+                <Calendar size={20} />
+              </button>
+            )}
             <button
               onClick={() => onNavigateToNotifications?.()}
               className="relative p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/20 transition-colors"

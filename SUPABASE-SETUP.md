@@ -50,7 +50,7 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 
 **Fichier : `supabase_schema.sql`**
 
-- Crée les tables : `users`, `workouts`, `exercises`, `nutrition_plans`, `meals`, `progress_logs`, `calendar_events`.
+- Crée les tables : `users`, `workouts`, `exercises`, `nutrition_plans`, `meals`, `progress_logs`, `calendar_events`, `athlete_appointments` (rendez-vous coach → athlète).
 - La ligne Realtime pour `messages` est commentée dans le fichier (la table `messages` est créée à l’étape 2).
 
 ### Étape 2 : RLS et table messages
@@ -71,6 +71,7 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 | 6 | `supabase_migration_workout_athlete_update.sql` | RLS : athlète peut mettre à jour sa séance (ex. marquer terminée) |
 | 7 | `supabase_migration_notifications.sql` | Table **notifications** + RLS (pour l’écran Notifications) |
 | 8 | `supabase_migration_user_gender.sql` | Colonne **gender** sur `users` (inscription Homme/Femme + biométrie) |
+| 9 | `supabase_migration_athlete_appointments.sql` | Table **athlete_appointments** (jour + heure des RDV coach) + RLS ; puis ré-exécuter les blocs RLS de `supabase_rls_safe.sql` pour cette table **ou** n’exécuter que le bloc `ATHLETE_APPOINTMENTS` ajouté en fin de `supabase_rls_safe.sql` |
 
 ### Après la dernière migration (optionnel)
 

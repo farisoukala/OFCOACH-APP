@@ -1,6 +1,11 @@
--- Supabase SQL Schema for OfCoach
--- users.id en TEXT (compatible avec ta base existante) ; workouts.id en UUID pour exercises.
--- Peut être exécuté même si les tables existent déjà (CREATE IF NOT EXISTS).
+/*
+  OfCoach - schema SQL Supabase (PostgreSQL)
+  users.id en TEXT ; workouts.id en UUID pour exercises.
+  Peut être exécuté même si les tables existent déjà (CREATE IF NOT EXISTS).
+
+  IMPORTANT : ne pas coller de lignes Markdown (ex. "- texte") ici : en SQL,
+  un commentaire de ligne commence par deux tirets : --
+*/
 
 -- Users Table (id TEXT pour correspondre à ta base existante)
 CREATE TABLE IF NOT EXISTS users (
@@ -86,6 +91,18 @@ CREATE TABLE IF NOT EXISTS calendar_events (
   duration TEXT,
   type TEXT,
   color TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Rendez-vous posés par le coach pour un athlète (jour + heure = starts_at)
+CREATE TABLE IF NOT EXISTS athlete_appointments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  athlete_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  coach_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  notes TEXT,
+  starts_at TIMESTAMPTZ NOT NULL,
+  duration_minutes INTEGER NOT NULL DEFAULT 60,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

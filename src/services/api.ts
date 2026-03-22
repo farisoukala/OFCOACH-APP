@@ -418,6 +418,55 @@ export async function deleteCalendarEvent(eventId: string) {
   if (error) throw error;
 }
 
+/** Rendez-vous coach → athlète (table athlete_appointments). */
+export async function fetchAthleteAppointments(athleteId: string) {
+  const { data, error } = await supabase
+    .from('athlete_appointments')
+    .select('*')
+    .eq('athlete_id', athleteId)
+    .order('starts_at', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export interface AthleteAppointmentInput {
+  title: string;
+  notes?: string | null;
+  starts_at: string;
+  duration_minutes?: number;
+}
+
+export async function createAthleteAppointment(
+  athleteId: string,
+  coachId: string,
+  input: AthleteAppointmentInput
+) {
+  const { data, error } = await supabase
+    .from('athlete_appointments')
+    .insert([
+      {
+        id: crypto.randomUUID(),
+        athlete_id: athleteId,
+        coach_id: coachId,
+        title: input.title.trim(),
+        notes: input.notes?.trim() || null,
+        starts_at: input.starts_at,
+        duration_minutes: input.duration_minutes ?? 60,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteAthleteAppointment(appointmentId: string) {
+  const { error } = await supabase.from('athlete_appointments').delete().eq('id', appointmentId);
+  if (error) throw error;
+}
+
 export async function fetchNotifications(userId: string) {
   const { data, error } = await supabase
     .from('notifications')

@@ -15,9 +15,24 @@ import {
   HeartPulse,
   MoreVertical,
   MessageSquare,
-  Utensils
+  Utensils,
+  Calendar,
 } from 'lucide-react';
-import { createWorkout, fetchClientById, updateUserProfile, fetchNutritionPlan, createNutritionPlan, addMealToPlan, createNotification, fetchBodyMeasurementSnapshots, fetchWorkoutsByAthlete, updateWorkout } from '../services/api';
+import {
+  createWorkout,
+  fetchClientById,
+  updateUserProfile,
+  fetchNutritionPlan,
+  createNutritionPlan,
+  addMealToPlan,
+  createNotification,
+  fetchBodyMeasurementSnapshots,
+  fetchWorkoutsByAthlete,
+  updateWorkout,
+  fetchAthleteAppointments,
+  createAthleteAppointment,
+  deleteAthleteAppointment,
+} from '../services/api';
 import { localTodayIso, nextOccurrenceJsWeekday, sortWorkoutsBySchedule, weekdayLabelFrFromIso } from '../lib/workoutPlanning';
 import { useAuth } from '../context/AuthContext';
 import { upsertBodyMeasurementSnapshot } from '../services/api';
@@ -30,6 +45,14 @@ interface ClientProfileProps {
 }
 
 const defaultAvatar = 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=200&auto=format&fit=crop';
+
+/** Combine date YYYY-MM-DD et heure HH:mm (local) → ISO pour Supabase. */
+function combineLocalDateTimeToIso(date: string, time: string): string {
+  const t = time && time.length === 5 ? `${time}:00` : time || '00:00:00';
+  const d = new Date(`${date}T${t}`);
+  if (Number.isNaN(d.getTime())) throw new Error('Date ou heure invalide.');
+  return d.toISOString();
+}
 
 const formatSupabaseError = (err: any, fallback: string) => {
   if (!err) return fallback;
@@ -86,6 +109,18 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [clientWorkouts, setClientWorkouts] = useState<any[]>([]);
   const [workoutsLoading, setWorkoutsLoading] = useState(false);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [clientAppointments, setClientAppointments] = useState<any[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [appointmentSaving, setAppointmentSaving] = useState(false);
+  const [appointmentFormError, setAppointmentFormError] = useState<string | null>(null);
+  const [appointmentForm, setAppointmentForm] = useState({
+    title: '',
+    date: localTodayIso(),
+    time: '10:00',
+    duration_minutes: 60,
+    notes: '',
+  });
   const [nutritionFormError, setNutritionFormError] = useState<string | null>(null);
   const [measurementSnapshots, setMeasurementSnapshots] = useState<any[]>([]);
   const [measurementMetric, setMeasurementMetric] = useState<
@@ -144,6 +179,18 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       .then((list) => setClientWorkouts(sortWorkoutsBySchedule(list)))
       .catch(() => setClientWorkouts([]))
       .finally(() => setWorkoutsLoading(false));
+  }, [selectedClientId]);
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setClientAppointments([]);
+      return;
+    }
+    setAppointmentsLoading(true);
+    fetchAthleteAppointments(selectedClientId)
+      .then(setClientAppointments)
+      .catch(() => setClientAppointments([]))
+      .finally(() => setAppointmentsLoading(false));
   }, [selectedClientId]);
 
   useEffect(() => {
@@ -234,6 +281,77 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
 
   const updateExercise = (id: string, field: string, value: any) => {
     setExercises(exercises.map(ex => ex.id === id ? { ...ex, [field]: value } : ex));
+  };
+
+  const handleCreateAppointment = async () => {
+    setAppointmentFormError(null);
+    if (!appointmentForm.title.trim()) {
+      setAppointmentFormError('Indique un titre pour le rendez-vous.');
+      return;
+    }
+    if (!appointmentForm.date) {
+      setAppointmentFormError('Choisis une date.');
+      return;
+    }
+    if (!appUser || appUser.role !== 'coach' || !selectedClientId) return;
+    let startsAt: string;
+    try {
+      startsAt = combineLocalDateTimeToIso(appointmentForm.date, appointmentForm.time || '10:00');
+    } catch {
+      setAppointmentFormError('Date ou heure invalide.');
+      return;
+    }
+    setAppointmentSaving(true);
+    try {
+      await createAthleteAppointment(selectedClientId, appUser.id, {
+        title: appointmentForm.title.trim(),
+        notes: appointmentForm.notes.trim() || null,
+        starts_at: startsAt,
+        duration_minutes: Math.max(15, Number(appointmentForm.duration_minutes) || 60),
+      });
+      try {
+        await createNotification(selectedClientId, {
+          type: 'appointment',
+          title: 'Nouveau rendez-vous',
+          body: `${appointmentForm.title.trim()} — ${new Date(startsAt).toLocaleString('fr-FR', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          })}`,
+        });
+      } catch {
+        /* optionnel */
+      }
+      const list = await fetchAthleteAppointments(selectedClientId);
+      setClientAppointments(list);
+      setShowAppointmentModal(false);
+      setAppointmentForm({
+        title: '',
+        date: localTodayIso(),
+        time: '10:00',
+        duration_minutes: 60,
+        notes: '',
+      });
+      setAppointmentFormError(null);
+      alert('Rendez-vous enregistré. L’athlète le verra dans son Planning.');
+    } catch (e: any) {
+      console.error(e);
+      setAppointmentFormError(formatSupabaseError(e, 'Erreur lors de la création du rendez-vous.'));
+    } finally {
+      setAppointmentSaving(false);
+    }
+  };
+
+  const handleDeleteAppointment = async (id: string) => {
+    if (!confirm('Supprimer ce rendez-vous ?')) return;
+    try {
+      await deleteAthleteAppointment(id);
+      if (selectedClientId) {
+        setClientAppointments(await fetchAthleteAppointments(selectedClientId));
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Impossible de supprimer le rendez-vous.');
+    }
   };
 
   const handleRescheduleWorkout = async (workoutId: string, newDate: string) => {
@@ -425,6 +543,26 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
           </div>
           <h2 className="mt-4 text-2xl font-bold">{client.name}</h2>
           <p className="text-slate-500 dark:text-slate-400 font-medium">Athlète{client.status ? ` • ${client.status}` : ''}</p>
+          {appUser?.role === 'coach' && (
+            <button
+              type="button"
+              onClick={() => {
+                setAppointmentFormError(null);
+                setAppointmentForm({
+                  title: '',
+                  date: localTodayIso(),
+                  time: '10:00',
+                  duration_minutes: 60,
+                  notes: '',
+                });
+                setShowAppointmentModal(true);
+              }}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500/15 text-sky-800 dark:text-sky-200 font-bold text-sm border border-sky-500/35 hover:bg-sky-500/25 transition-colors shadow-sm"
+            >
+              <Calendar size={18} />
+              Rendez-vous (jour + heure)
+            </button>
+          )}
         </section>
 
         <section
@@ -606,6 +744,87 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
           )}
         </section>
 
+        {appUser?.role === 'coach' && (
+          <section id="rendez-vous-coach-client" className="space-y-4 scroll-mt-24 rounded-2xl border-2 border-sky-500/30 bg-sky-500/5 dark:bg-sky-500/10 p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Calendar className="text-sky-600 dark:text-sky-400" size={22} />
+                Rendez-vous
+              </h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setAppointmentFormError(null);
+                  setAppointmentForm({
+                    title: '',
+                    date: localTodayIso(),
+                    time: '10:00',
+                    duration_minutes: 60,
+                    notes: '',
+                  });
+                  setShowAppointmentModal(true);
+                }}
+                className="text-sky-700 dark:text-sky-300 text-sm font-bold flex items-center gap-1 hover:underline shrink-0"
+              >
+                <Plus size={16} />
+                Planifier
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-400 -mt-1">
+              Créneaux visibles par l’athlète dans <strong>Accueil</strong> et <strong>Planning</strong>.
+            </p>
+            <div className="space-y-3">
+              {appointmentsLoading ? (
+                <div className="bg-white/60 dark:bg-slate-800/50 rounded-2xl p-8 text-center text-slate-500 text-sm border border-sky-500/20">
+                  Chargement des rendez-vous…
+                </div>
+              ) : clientAppointments.length === 0 ? (
+                <div className="bg-white/60 dark:bg-slate-800/50 rounded-2xl p-8 text-center text-slate-500 text-sm border border-dashed border-sky-500/25">
+                  Aucun rendez-vous. Utilise « Planifier » pour fixer jour et heure.
+                </div>
+              ) : (
+                clientAppointments.map((a) => {
+                  const when = a.starts_at ? new Date(a.starts_at) : null;
+                  return (
+                    <div
+                      key={a.id}
+                      className="bg-white/80 dark:bg-slate-800/60 rounded-2xl p-4 border border-sky-500/15 flex items-start justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <h4 className="font-bold">{a.title}</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          {when
+                            ? when.toLocaleString('fr-FR', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : '—'}
+                          {a.duration_minutes != null ? ` · ${a.duration_minutes} min` : ''}
+                        </p>
+                        {a.notes?.trim() ? (
+                          <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">{a.notes}</p>
+                        ) : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAppointment(a.id)}
+                        className="shrink-0 p-2 rounded-xl text-red-500 hover:bg-red-500/10"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-bold flex items-center gap-2">
@@ -745,6 +964,96 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
           </>
         )}
       </main>
+
+      {/* Rendez-vous athlète (coach) */}
+      {showAppointmentModal && appUser?.role === 'coach' && (
+        <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
+          <div
+            role="presentation"
+            onClick={() => !appointmentSaving && setShowAppointmentModal(false)}
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+          />
+          <div className="relative w-full max-w-lg bg-background-light dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
+                <Calendar className="text-primary" size={22} />
+                Planifier un rendez-vous
+              </h3>
+              <button
+                type="button"
+                onClick={() => !appointmentSaving && setShowAppointmentModal(false)}
+                className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {appointmentFormError && <p className="text-sm text-red-500">{appointmentFormError}</p>}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Titre</label>
+                <input
+                  value={appointmentForm.title}
+                  onChange={(e) => setAppointmentForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="Ex : Bilan mensuel, Séance studio, Appel visio…"
+                  className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl p-4 outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Date</label>
+                  <input
+                    type="date"
+                    value={appointmentForm.date}
+                    onChange={(e) => setAppointmentForm((f) => ({ ...f, date: e.target.value }))}
+                    className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl p-4 outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Heure</label>
+                  <input
+                    type="time"
+                    value={appointmentForm.time}
+                    onChange={(e) => setAppointmentForm((f) => ({ ...f, time: e.target.value }))}
+                    className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl p-4 outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Durée (minutes)</label>
+                <input
+                  type="number"
+                  min={15}
+                  step={15}
+                  value={appointmentForm.duration_minutes}
+                  onChange={(e) =>
+                    setAppointmentForm((f) => ({ ...f, duration_minutes: parseInt(e.target.value, 10) || 60 }))
+                  }
+                  className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl p-4 outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Notes (optionnel)</label>
+                <textarea
+                  value={appointmentForm.notes}
+                  onChange={(e) => setAppointmentForm((f) => ({ ...f, notes: e.target.value }))}
+                  placeholder="Lieu, lien visio, consignes…"
+                  className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl p-4 outline-none focus:ring-2 focus:ring-primary h-24 resize-none"
+                />
+              </div>
+            </div>
+            <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => void handleCreateAppointment()}
+                disabled={appointmentSaving}
+                className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
+              >
+                {appointmentSaving ? 'Enregistrement…' : 'Enregistrer le rendez-vous'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Workout Creation Modal */}
       {showWorkoutModal && (

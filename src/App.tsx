@@ -123,6 +123,7 @@ export default function App() {
               setNotificationsReturnTo('athlete_dashboard');
               setCurrentScreen('notifications');
             }}
+            onNavigateToCalendar={() => setCurrentScreen('calendar')}
           />
         );
       case 'messages':

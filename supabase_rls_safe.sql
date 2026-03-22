@@ -125,6 +125,26 @@ BEGIN
   END IF;
 END $$;
 
+-- ---------- ATHLETE_APPOINTMENTS (RDV coach → athlète) ----------
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'athlete_appointments') THEN
+    ALTER TABLE public.athlete_appointments ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Athlete appointments select" ON public.athlete_appointments;
+    CREATE POLICY "Athlete appointments select" ON public.athlete_appointments FOR SELECT TO authenticated
+      USING ((athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid());
+    DROP POLICY IF EXISTS "Athlete appointments insert coach" ON public.athlete_appointments;
+    CREATE POLICY "Athlete appointments insert coach" ON public.athlete_appointments FOR INSERT TO authenticated
+      WITH CHECK ((coach_id::uuid) = auth.uid());
+    DROP POLICY IF EXISTS "Athlete appointments update coach" ON public.athlete_appointments;
+    CREATE POLICY "Athlete appointments update coach" ON public.athlete_appointments FOR UPDATE TO authenticated
+      USING ((coach_id::uuid) = auth.uid()) WITH CHECK ((coach_id::uuid) = auth.uid());
+    DROP POLICY IF EXISTS "Athlete appointments delete coach" ON public.athlete_appointments;
+    CREATE POLICY "Athlete appointments delete coach" ON public.athlete_appointments FOR DELETE TO authenticated
+      USING ((coach_id::uuid) = auth.uid());
+  END IF;
+END $$;
+
 -- ---------- MESSAGES ----------
 CREATE TABLE IF NOT EXISTS public.messages (
   id TEXT PRIMARY KEY,

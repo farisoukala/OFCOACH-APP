@@ -8,7 +8,12 @@ import {
   X,
   Trash2,
 } from 'lucide-react';
-import { fetchCalendarEvents, createCalendarEvent, deleteCalendarEvent } from '../services/api';
+import {
+  fetchCalendarEvents,
+  createCalendarEvent,
+  deleteCalendarEvent,
+  fetchAthleteAppointments,
+} from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
@@ -23,6 +28,36 @@ function formatDateKey(d: Date): string {
 
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+/** Transforme un RDV coach (starts_at) en ligne compatible avec le calendrier perso. */
+function appointmentToCalendarRow(a: {
+  id: string;
+  title: string;
+  starts_at: string;
+  duration_minutes?: number | null;
+  notes?: string | null;
+}) {
+  const d = new Date(a.starts_at);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const date = `${y}-${m}-${day}`;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const duration = a.duration_minutes != null ? `${a.duration_minutes} min` : null;
+  return {
+    id: `appt-${a.id}`,
+    rawId: a.id,
+    title: a.title,
+    date,
+    time,
+    duration,
+    type: 'Rendez-vous coach',
+    color: '#0ea5e9',
+    _fromCoachAppointment: true,
+    notes: a.notes,
+  };
 }
 
 interface CalendarProps {
@@ -137,11 +172,18 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
         <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
           <ChevronLeft size={24} />
         </button>
-        <h1 className="text-xl font-bold tracking-tight">Planning</h1>
+        <div className="text-center flex-1">
+          <h1 className="text-xl font-bold tracking-tight">Planning</h1>
+          {isAthlete && (
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5 px-2">
+              Rendez-vous coach + tes événements perso
+            </p>
+          )}
+        </div>
         <button
           onClick={openAddModal}
           className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 transition-all"
-          title="Ajouter un événement"
+          title={isAthlete ? 'Ajouter un événement perso' : 'Ajouter un événement'}
         >
           <Plus size={24} />
         </button>
@@ -224,14 +266,19 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
                           {[event.duration, event.type].filter(Boolean).join(' · ')}
                         </span>
                       )}
+                      {event.notes?.trim?.() && (
+                        <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">{event.notes}</p>
+                      )}
                     </div>
-                    <button
-                      onClick={(e) => handleDeleteEvent(e, event.id)}
-                      className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
-                      title="Supprimer"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    {!event._fromCoachAppointment && (
+                      <button
+                        onClick={(e) => handleDeleteEvent(e, event.id)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
