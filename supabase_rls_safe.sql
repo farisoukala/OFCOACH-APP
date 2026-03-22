@@ -67,6 +67,10 @@ BEGIN
     DROP POLICY IF EXISTS "Nutrition plans delete as coach" ON public.nutrition_plans;
     CREATE POLICY "Nutrition plans delete as coach" ON public.nutrition_plans FOR DELETE TO authenticated
       USING ((coach_id::uuid) = auth.uid());
+    DROP POLICY IF EXISTS "Nutrition plans update as athlete" ON public.nutrition_plans;
+    CREATE POLICY "Nutrition plans update as athlete" ON public.nutrition_plans FOR UPDATE TO authenticated
+      USING ((athlete_id::uuid) = auth.uid())
+      WITH CHECK ((athlete_id::uuid) = auth.uid());
   END IF;
 END $$;
 
@@ -88,6 +92,12 @@ BEGIN
     DROP POLICY IF EXISTS "Meals delete via plan" ON public.meals;
     CREATE POLICY "Meals delete via plan" ON public.meals FOR DELETE TO authenticated
       USING (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (coach_id::uuid) = auth.uid()));
+    DROP POLICY IF EXISTS "Meals insert as athlete own plan" ON public.meals;
+    CREATE POLICY "Meals insert as athlete own plan" ON public.meals FOR INSERT TO authenticated
+      WITH CHECK (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (athlete_id::uuid) = auth.uid()));
+    DROP POLICY IF EXISTS "Meals delete as athlete own plan" ON public.meals;
+    CREATE POLICY "Meals delete as athlete own plan" ON public.meals FOR DELETE TO authenticated
+      USING (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (athlete_id::uuid) = auth.uid()));
   END IF;
 END $$;
 

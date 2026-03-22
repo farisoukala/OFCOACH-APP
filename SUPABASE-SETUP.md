@@ -72,6 +72,7 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 | 7 | `supabase_migration_notifications.sql` | Table **notifications** + RLS (pour l’écran Notifications) |
 | 8 | `supabase_migration_user_gender.sql` | Colonne **gender** sur `users` (inscription Homme/Femme + biométrie) |
 | 9 | `supabase_migration_athlete_appointments.sql` | Table **athlete_appointments** (jour + heure des RDV coach) + RLS ; puis ré-exécuter les blocs RLS de `supabase_rls_safe.sql` pour cette table **ou** n’exécuter que le bloc `ATHLETE_APPOINTMENTS` ajouté en fin de `supabase_rls_safe.sql` |
+| 10 | `supabase_migration_nutrition_athlete_edit.sql` | RLS : l’**athlète** peut **modifier** son plan nutritionnel et **ajouter/supprimer** des repas (écran Nutrition) |
 
 ### Après la dernière migration (optionnel)
 
