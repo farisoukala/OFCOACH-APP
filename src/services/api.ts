@@ -231,6 +231,37 @@ export async function createNutritionPlan(athleteId: string, coachId: string, pl
   return data;
 }
 
+export async function updateNutritionPlan(planId: string, plan: Partial<NutritionPlanInput>) {
+  const payload: Record<string, unknown> = {};
+  if (plan.title !== undefined) payload.title = plan.title;
+  if (plan.date !== undefined) payload.date = plan.date;
+  if (plan.calories_target !== undefined) payload.calories_target = plan.calories_target;
+  if (plan.protein_target !== undefined) payload.protein_target = plan.protein_target;
+  if (plan.carbs_target !== undefined) payload.carbs_target = plan.carbs_target;
+  if (plan.fat_target !== undefined) payload.fat_target = plan.fat_target;
+
+  const { data, error } = await supabase
+    .from('nutrition_plans')
+    .update(payload)
+    .eq('id', planId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/** Supprime tous les repas d’un plan (avant réinsertion en édition). RLS : coach du plan. */
+export async function deleteMealsForPlan(planId: string) {
+  const { error } = await supabase.from('meals').delete().eq('plan_id', planId);
+  if (error) throw error;
+}
+
+export async function deleteNutritionPlan(planId: string) {
+  const { error } = await supabase.from('nutrition_plans').delete().eq('id', planId);
+  if (error) throw error;
+}
+
 export interface MealInput {
   name: string;
   calories?: number | null;

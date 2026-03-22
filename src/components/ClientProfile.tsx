@@ -25,6 +25,9 @@ import {
   updateUserProfile,
   fetchNutritionPlan,
   createNutritionPlan,
+  updateNutritionPlan,
+  deleteNutritionPlan,
+  deleteMealsForPlan,
   addMealToPlan,
   createNotification,
   fetchBodyMeasurementSnapshots,
@@ -139,6 +142,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   });
   const [editingAppointmentId, setEditingAppointmentId] = useState<string | null>(null);
   const [nutritionFormError, setNutritionFormError] = useState<string | null>(null);
+  const [editingNutritionPlanId, setEditingNutritionPlanId] = useState<string | null>(null);
   const [measurementSnapshots, setMeasurementSnapshots] = useState<any[]>([]);
   const [measurementMetric, setMeasurementMetric] = useState<
     'taille_cm' | 'tour_poitrine_cm' | 'tour_ventre_cm' | 'tour_hanche_cm' | 'tour_bras_cm' | 'tour_epaule_cm' | 'tour_mollet_cm'
@@ -506,7 +510,73 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     setNutritionMeals((m) => m.map((row, i) => (i === idx ? { ...row, [field]: value } : row)));
   };
 
-  const handleCreateNutritionPlan = async () => {
+  const openNewNutritionModal = () => {
+    setEditingNutritionPlanId(null);
+    setNutritionForm({
+      title: 'Plan du jour',
+      date: new Date().toISOString().split('T')[0],
+      calories_target: 2000,
+      protein_target: 150,
+      carbs_target: 250,
+      fat_target: 70,
+    });
+    setNutritionMeals([{ name: '', calories: '', protein: '', carbs: '', fat: '', time: '12:00' }]);
+    setNutritionFormError(null);
+    setShowNutritionModal(true);
+  };
+
+  const openEditNutritionModal = () => {
+    if (!nutritionPlan) return;
+    setEditingNutritionPlanId(nutritionPlan.id);
+    const d = nutritionPlan.date ? String(nutritionPlan.date).slice(0, 10) : localTodayIso();
+    setNutritionForm({
+      title: nutritionPlan.title || 'Plan du jour',
+      date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : localTodayIso(),
+      calories_target: nutritionPlan.calories_target ?? 2000,
+      protein_target: nutritionPlan.protein_target ?? 150,
+      carbs_target: nutritionPlan.carbs_target ?? 250,
+      fat_target: nutritionPlan.fat_target ?? 70,
+    });
+    const meals = nutritionPlan.meals;
+    if (Array.isArray(meals) && meals.length > 0) {
+      setNutritionMeals(
+        meals.map((m: any) => ({
+          name: m.name ?? '',
+          calories: m.calories != null ? String(m.calories) : '',
+          protein: m.protein != null ? String(m.protein) : '',
+          carbs: m.carbs != null ? String(m.carbs) : '',
+          fat: m.fat != null ? String(m.fat) : '',
+          time: m.time ?? '12:00',
+        }))
+      );
+    } else {
+      setNutritionMeals([{ name: '', calories: '', protein: '', carbs: '', fat: '', time: '12:00' }]);
+    }
+    setNutritionFormError(null);
+    setShowNutritionModal(true);
+  };
+
+  const closeNutritionModal = () => {
+    if (savingNutrition) return;
+    setShowNutritionModal(false);
+    setEditingNutritionPlanId(null);
+    setNutritionFormError(null);
+  };
+
+  const handleDeleteNutritionPlan = async () => {
+    if (!nutritionPlan?.id || !appUser || appUser.role !== 'coach' || !selectedClientId) return;
+    if (!confirm('Supprimer ce plan nutritionnel et tous ses repas ?')) return;
+    try {
+      await deleteNutritionPlan(nutritionPlan.id);
+      setNutritionPlan(await fetchNutritionPlan(selectedClientId));
+      alert('Plan supprimé.');
+    } catch (e: any) {
+      console.error(e);
+      alert(formatSupabaseError(e, 'Impossible de supprimer le plan.'));
+    }
+  };
+
+  const handleSaveNutritionPlan = async () => {
     setNutritionFormError(null);
     if (!appUser || appUser.role !== 'coach' || !selectedClientId) return;
     const mealsToAdd = nutritionMeals.filter((m) => m.name.trim());
@@ -515,6 +585,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       return;
     }
     setSavingNutrition(true);
+    const isEditMode = !!editingNutritionPlanId;
     try {
       const toIntOrNull = (v: any) => {
         if (v === null || v === undefined) return null;
@@ -524,16 +595,46 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         return Number.isNaN(n) ? null : n;
       };
 
-      const plan = await createNutritionPlan(selectedClientId, appUser.id, {
+      const planPayload = {
         title: nutritionForm.title || 'Plan du jour',
         date: nutritionForm.date || new Date().toISOString().split('T')[0],
         calories_target: nutritionForm.calories_target || null,
         protein_target: nutritionForm.protein_target || null,
         carbs_target: nutritionForm.carbs_target || null,
         fat_target: nutritionForm.fat_target || null,
-      });
+      };
+
+      let planId: string;
+
+      if (editingNutritionPlanId) {
+        await updateNutritionPlan(editingNutritionPlanId, planPayload);
+        await deleteMealsForPlan(editingNutritionPlanId);
+        planId = editingNutritionPlanId;
+        try {
+          await createNotification(selectedClientId, {
+            type: 'nutrition',
+            title: 'Plan nutritionnel mis à jour',
+            body: planPayload.title,
+          });
+        } catch (_) {
+          /* optionnel */
+        }
+      } else {
+        const plan = await createNutritionPlan(selectedClientId, appUser.id, planPayload);
+        planId = plan.id;
+        try {
+          await createNotification(selectedClientId, {
+            type: 'nutrition',
+            title: 'Nouveau plan nutritionnel',
+            body: planPayload.title,
+          });
+        } catch (_) {
+          /* optionnel */
+        }
+      }
+
       for (const meal of mealsToAdd) {
-        await addMealToPlan(plan.id, {
+        await addMealToPlan(planId, {
           name: meal.name.trim(),
           calories: toIntOrNull(meal.calories),
           protein: toIntOrNull(meal.protein),
@@ -542,20 +643,18 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
           time: meal.time || null,
         });
       }
-      try {
-        await createNotification(selectedClientId, {
-          type: 'nutrition',
-          title: 'Nouveau plan nutritionnel',
-          body: nutritionForm.title || 'Plan du jour',
-        });
-      } catch (_) { /* notification optionnelle */ }
+
       setNutritionPlan(await fetchNutritionPlan(selectedClientId));
       setShowNutritionModal(false);
+      setEditingNutritionPlanId(null);
       setNutritionFormError(null);
-      alert('Plan nutritionnel créé.');
+      alert(isEditMode ? 'Plan nutritionnel mis à jour.' : 'Plan nutritionnel créé.');
     } catch (e: any) {
       console.error(e);
-      const msg = formatSupabaseError(e, 'Erreur lors de la création du plan.');
+      const msg = formatSupabaseError(
+        e,
+        isEditMode ? 'Erreur lors de la mise à jour du plan.' : 'Erreur lors de la création du plan.'
+      );
       setNutritionFormError(msg);
     } finally {
       setSavingNutrition(false);
@@ -981,18 +1080,36 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
               Nutrition
             </h3>
             {appUser?.role === 'coach' && (
-              <button
-                onClick={() => {
-                  setNutritionForm({ title: 'Plan du jour', date: new Date().toISOString().split('T')[0], calories_target: 2000, protein_target: 150, carbs_target: 250, fat_target: 70 });
-                  setNutritionMeals([{ name: '', calories: '', protein: '', carbs: '', fat: '', time: '12:00' }]);
-                  setNutritionFormError(null);
-                  setShowNutritionModal(true);
-                }}
-                className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
-              >
-                <Plus size={16} />
-                {nutritionPlan ? 'Nouveau plan' : 'Créer un plan'}
-              </button>
+              <div className="flex flex-wrap items-center gap-2 justify-end">
+                {nutritionPlan && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={openEditNutritionModal}
+                      className="text-sky-700 dark:text-sky-300 text-sm font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <Pencil size={14} />
+                      Modifier
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteNutritionPlan()}
+                      className="text-red-600 dark:text-red-400 text-sm font-bold flex items-center gap-1 hover:underline"
+                    >
+                      <Trash2 size={14} />
+                      Supprimer
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={openNewNutritionModal}
+                  className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
+                >
+                  <Plus size={16} />
+                  {nutritionPlan ? 'Nouveau plan' : 'Créer un plan'}
+                </button>
+              </div>
             )}
           </div>
           {nutritionPlan ? (
@@ -1002,6 +1119,11 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                 {nutritionPlan.calories_target ?? '—'} kcal • P: {nutritionPlan.protein_target ?? '—'}g • G: {nutritionPlan.carbs_target ?? '—'}g • L: {nutritionPlan.fat_target ?? '—'}g
               </p>
               <p className="text-xs text-slate-400 mt-2">{nutritionPlan.meals?.length ?? 0} repas</p>
+              {appUser?.role === 'coach' && (
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3">
+                  Utilise <strong>Modifier</strong> pour changer objectifs et repas, ou <strong>Supprimer</strong> pour retirer ce plan.
+                </p>
+              )}
             </div>
           ) : (
             <div className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-5 border border-dashed border-slate-300 dark:border-slate-700 text-center text-slate-500 dark:text-slate-400 text-sm">
@@ -1278,11 +1400,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       {/* Nutrition Plan Modal */}
       {showNutritionModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <div role="presentation" onClick={() => !savingNutrition && setShowNutritionModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div role="presentation" onClick={() => closeNutritionModal()} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-lg bg-background-light dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                <h3 className="text-xl font-bold tracking-tight">Créer un plan nutritionnel</h3>
-                <button onClick={() => !savingNutrition && setShowNutritionModal(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <h3 className="text-xl font-bold tracking-tight">
+                  {editingNutritionPlanId ? 'Modifier le plan nutritionnel' : 'Créer un plan nutritionnel'}
+                </h3>
+                <button type="button" onClick={() => closeNutritionModal()} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                   <X size={24} />
                 </button>
               </div>
@@ -1345,8 +1469,17 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                 </div>
               </div>
               <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
-                <button onClick={handleCreateNutritionPlan} disabled={savingNutrition} className="w-full bg-primary text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all">
-                  {savingNutrition ? 'Création...' : 'Créer le plan'}
+                <button
+                  type="button"
+                  onClick={() => void handleSaveNutritionPlan()}
+                  disabled={savingNutrition}
+                  className="w-full bg-primary text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                >
+                  {savingNutrition
+                    ? 'Enregistrement...'
+                    : editingNutritionPlanId
+                      ? 'Enregistrer les modifications'
+                      : 'Créer le plan'}
                 </button>
               </div>
             </div>
