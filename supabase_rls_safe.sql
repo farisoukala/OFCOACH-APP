@@ -75,31 +75,8 @@ BEGIN
 END $$;
 
 -- ---------- MEALS ----------
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'meals') THEN
-    ALTER TABLE public.meals ENABLE ROW LEVEL SECURITY;
-    DROP POLICY IF EXISTS "Meals select via plan" ON public.meals;
-    CREATE POLICY "Meals select via plan" ON public.meals FOR SELECT TO authenticated
-      USING (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()));
-    DROP POLICY IF EXISTS "Meals insert via plan" ON public.meals;
-    CREATE POLICY "Meals insert via plan" ON public.meals FOR INSERT TO authenticated
-      WITH CHECK (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (coach_id::uuid) = auth.uid()));
-    DROP POLICY IF EXISTS "Meals update via plan" ON public.meals;
-    CREATE POLICY "Meals update via plan" ON public.meals FOR UPDATE TO authenticated
-      USING (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()))
-      WITH CHECK (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()));
-    DROP POLICY IF EXISTS "Meals delete via plan" ON public.meals;
-    CREATE POLICY "Meals delete via plan" ON public.meals FOR DELETE TO authenticated
-      USING (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (coach_id::uuid) = auth.uid()));
-    DROP POLICY IF EXISTS "Meals insert as athlete own plan" ON public.meals;
-    CREATE POLICY "Meals insert as athlete own plan" ON public.meals FOR INSERT TO authenticated
-      WITH CHECK (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (athlete_id::uuid) = auth.uid()));
-    DROP POLICY IF EXISTS "Meals delete as athlete own plan" ON public.meals;
-    CREATE POLICY "Meals delete as athlete own plan" ON public.meals FOR DELETE TO authenticated
-      USING (plan_id IN (SELECT id FROM public.nutrition_plans WHERE (athlete_id::uuid) = auth.uid()));
-  END IF;
-END $$;
+-- Table supprimée : exécuter supabase_migration_drop_meals.sql sur les projets existants.
+-- Les nouveaux projets n’ont plus de table meals (voir supabase_schema.sql).
 
 -- ---------- PROGRESS_LOGS ----------
 DO $$

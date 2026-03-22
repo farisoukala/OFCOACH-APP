@@ -27,7 +27,6 @@ import {
   createNutritionPlan,
   updateNutritionPlan,
   deleteNutritionPlan,
-  deleteMealsForPlan,
   createNotification,
   fetchBodyMeasurementSnapshots,
   fetchWorkoutsByAthlete,
@@ -565,7 +564,6 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
 
       if (editingNutritionPlanId) {
         await updateNutritionPlan(editingNutritionPlanId, planPayload);
-        await deleteMealsForPlan(editingNutritionPlanId);
         try {
           await createNotification(selectedClientId, {
             type: 'nutrition',

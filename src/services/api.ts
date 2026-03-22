@@ -251,47 +251,9 @@ export async function updateNutritionPlan(planId: string, plan: Partial<Nutritio
   return data;
 }
 
-/** Supprime tous les repas d’un plan (avant réinsertion en édition). RLS : coach du plan. */
-export async function deleteMealsForPlan(planId: string) {
-  const { error } = await supabase.from('meals').delete().eq('plan_id', planId);
-  if (error) throw error;
-}
-
 export async function deleteNutritionPlan(planId: string) {
   const { error } = await supabase.from('nutrition_plans').delete().eq('id', planId);
   if (error) throw error;
-}
-
-export interface MealInput {
-  name: string;
-  calories?: number | null;
-  protein?: number | null;
-  carbs?: number | null;
-  fat?: number | null;
-  time?: string | null;
-}
-
-export async function addMealToPlan(planId: string, meal: MealInput) {
-  const { data, error } = await supabase
-    .from('meals')
-    .insert([{ id: crypto.randomUUID(), plan_id: planId, ...meal, is_completed: false }])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function updateMeal(mealId: string, updates: { is_completed?: boolean; name?: string; calories?: number; protein?: number; carbs?: number; fat?: number; time?: string }) {
-  const { data, error } = await supabase
-    .from('meals')
-    .update(updates)
-    .eq('id', mealId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
 }
 
 export async function fetchProgressLogs(athleteId: string) {

@@ -114,54 +114,8 @@ CREATE POLICY "Nutrition plans delete as coach"
   TO authenticated
   USING ((coach_id::uuid) = auth.uid());
 
-
 -- ---------- MEALS ----------
-ALTER TABLE public.meals ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Meals select via plan"
-  ON public.meals FOR SELECT
-  TO authenticated
-  USING (
-    plan_id IN (
-      SELECT id FROM public.nutrition_plans
-      WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()
-    )
-  );
-
-CREATE POLICY "Meals insert via plan"
-  ON public.meals FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    plan_id IN (
-      SELECT id FROM public.nutrition_plans WHERE (coach_id::uuid) = auth.uid()
-    )
-  );
-
-CREATE POLICY "Meals update via plan"
-  ON public.meals FOR UPDATE
-  TO authenticated
-  USING (
-    plan_id IN (
-      SELECT id FROM public.nutrition_plans
-      WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()
-    )
-  )
-  WITH CHECK (
-    plan_id IN (
-      SELECT id FROM public.nutrition_plans
-      WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()
-    )
-  );
-
-CREATE POLICY "Meals delete via plan"
-  ON public.meals FOR DELETE
-  TO authenticated
-  USING (
-    plan_id IN (
-      SELECT id FROM public.nutrition_plans WHERE (coach_id::uuid) = auth.uid()
-    )
-  );
-
+-- Table supprimée : utiliser supabase_migration_drop_meals.sql sur les bases existantes.
 
 -- ---------- PROGRESS_LOGS ----------
 ALTER TABLE public.progress_logs ENABLE ROW LEVEL SECURITY;

@@ -56,20 +56,6 @@ CREATE TABLE IF NOT EXISTS nutrition_plans (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Meals Table
-CREATE TABLE IF NOT EXISTS meals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  plan_id UUID REFERENCES nutrition_plans(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  calories INTEGER,
-  protein INTEGER,
-  carbs INTEGER,
-  fat INTEGER,
-  time TEXT,
-  is_completed BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
 -- Progress Logs Table
 CREATE TABLE IF NOT EXISTS progress_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

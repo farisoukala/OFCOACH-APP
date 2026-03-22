@@ -50,7 +50,7 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 
 **Fichier : `supabase_schema.sql`**
 
-- Crée les tables : `users`, `workouts`, `exercises`, `nutrition_plans`, `meals`, `progress_logs`, `calendar_events`, `athlete_appointments` (rendez-vous coach → athlète).
+- Crée les tables : `users`, `workouts`, `exercises`, `nutrition_plans`, `progress_logs`, `calendar_events`, `athlete_appointments` (rendez-vous coach → athlète). *(La table `meals` a été retirée : objectifs macros sur `nutrition_plans` uniquement.)*
 - La ligne Realtime pour `messages` est commentée dans le fichier (la table `messages` est créée à l’étape 2).
 
 ### Étape 2 : RLS et table messages
@@ -72,7 +72,12 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 | 7 | `supabase_migration_notifications.sql` | Table **notifications** + RLS (pour l’écran Notifications) |
 | 8 | `supabase_migration_user_gender.sql` | Colonne **gender** sur `users` (inscription Homme/Femme + biométrie) |
 | 9 | `supabase_migration_athlete_appointments.sql` | Table **athlete_appointments** (jour + heure des RDV coach) + RLS ; puis ré-exécuter les blocs RLS de `supabase_rls_safe.sql` pour cette table **ou** n’exécuter que le bloc `ATHLETE_APPOINTMENTS` ajouté en fin de `supabase_rls_safe.sql` |
-| 10 | `supabase_migration_nutrition_athlete_edit.sql` | RLS : l’**athlète** peut **modifier** son plan nutritionnel et **ajouter/supprimer** des repas (écran Nutrition) |
+| 10 | `supabase_migration_nutrition_athlete_edit.sql` | RLS : l’**athlète** peut **modifier** les objectifs de son plan (`nutrition_plans`) |
+| 11 | `supabase_migration_drop_meals.sql` | **Bases déjà en prod** : supprime la table **`meals`** et les données repas (à lancer une fois si l’ancien schéma avait `meals`) |
+
+**Nouveau déploiement from scratch** : `supabase_schema.sql` + `supabase_rls_safe.sql` n’incluent plus `meals` → l’étape 11 est **inutile**.
+
+> Les anciens fichiers `supabase_fix_nutrition_*.sql` / `supabase_rls.sql` historiques peuvent encore mentionner `meals` : **ne pas** les ré-exécuter après `supabase_migration_drop_meals.sql` (erreur « relation meals does not exist »). Utilise plutôt `supabase_rls_safe.sql` à jour.
 
 ### Après la dernière migration (optionnel)
 
@@ -89,7 +94,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 ## 3. Vérification rapide
 
 - **Authentication** : un utilisateur peut s’inscrire et se connecter.
-- **Tables** : dans **Table Editor**, tu vois au moins `users`, `workouts`, `exercises`, `nutrition_plans`, `meals`, `progress_logs`, `calendar_events`, `messages`, `notifications`.
+- **Tables** : dans **Table Editor**, tu vois au moins `users`, `workouts`, `exercises`, `nutrition_plans`, `progress_logs`, `calendar_events`, `messages`, `notifications` (plus de `meals` après la migration 11 si tu l’as exécutée).
 - **RLS** : chaque table a des politiques (voir **Authentication** → **Policies** ou la vue SQL des policies).
 
 Si une migration échoue (colonne déjà existante, policy déjà existante), tu peux ignorer l’erreur pour cette ligne ou utiliser les variantes `IF NOT EXISTS` / `DROP POLICY IF EXISTS` déjà présentes dans les scripts.

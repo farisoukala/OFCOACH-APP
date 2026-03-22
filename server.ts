@@ -12,6 +12,9 @@ const __dirname = path.dirname(__filename);
 
 const db = new Database('ofcoach.db');
 
+// Ancienne table repas (SQLite local) — supprimée si elle existait encore
+db.exec('DROP TABLE IF EXISTS meals;');
+
 // Initialize database schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
@@ -82,19 +85,6 @@ db.exec(`
     fat_target INTEGER,
     FOREIGN KEY(athlete_id) REFERENCES users(id),
     FOREIGN KEY(coach_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS meals (
-    id TEXT PRIMARY KEY,
-    plan_id TEXT,
-    name TEXT NOT NULL,
-    calories INTEGER,
-    protein INTEGER,
-    carbs INTEGER,
-    fat INTEGER,
-    time TEXT,
-    is_completed INTEGER DEFAULT 0,
-    FOREIGN KEY(plan_id) REFERENCES nutrition_plans(id)
   );
 
   CREATE TABLE IF NOT EXISTS progress_logs (
@@ -186,9 +176,7 @@ async function startServer() {
 
   app.get('/api/nutrition/athlete/:id', (req, res) => {
     const plan = db.prepare('SELECT * FROM nutrition_plans WHERE athlete_id = ? ORDER BY date DESC LIMIT 1').get(req.params.id);
-    if (!plan) return res.json(null);
-    const meals = db.prepare('SELECT * FROM meals WHERE plan_id = ?').all();
-    res.json({ ...plan, meals });
+    res.json(plan || null);
   });
 
   app.get('/api/progress/athlete/:id', (req, res) => {
