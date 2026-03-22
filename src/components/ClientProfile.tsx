@@ -140,6 +140,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [editingAppointmentId, setEditingAppointmentId] = useState<string | null>(null);
   const [nutritionFormError, setNutritionFormError] = useState<string | null>(null);
   const [editingNutritionPlanId, setEditingNutritionPlanId] = useState<string | null>(null);
+  const [savingAthleteObjective, setSavingAthleteObjective] = useState(false);
   const [measurementSnapshots, setMeasurementSnapshots] = useState<any[]>([]);
   const [measurementMetric, setMeasurementMetric] = useState<
     'taille_cm' | 'tour_poitrine_cm' | 'tour_ventre_cm' | 'tour_hanche_cm' | 'tour_bras_cm' | 'tour_epaule_cm' | 'tour_mollet_cm'
@@ -265,6 +266,25 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       alert('Erreur lors de l’enregistrement du profil');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  /** Objectif texte (accueil athlète) — enregistrement depuis la section Nutrition, sans « Modifier le profil ». */
+  const handleSaveAthleteObjective = async () => {
+    if (!selectedClientId) return;
+    setSavingAthleteObjective(true);
+    try {
+      await updateUserProfile(selectedClientId, {
+        objectives: profileForm.objectives.trim() || null,
+      });
+      const fresh = await fetchClientById(selectedClientId);
+      setClient(fresh);
+      setProfileForm((f) => ({ ...f, objectives: fresh.objectives ?? '' }));
+    } catch (e) {
+      console.error(e);
+      alert('Impossible d’enregistrer l’objectif. Réessaie ou vérifie les droits RLS.');
+    } finally {
+      setSavingAthleteObjective(false);
     }
   };
 
@@ -1054,6 +1074,46 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
               </div>
             )}
           </div>
+
+          {appUser?.role === 'coach' && (
+            <div
+              id="objectif-accueil-athlete"
+              className="rounded-2xl border-2 border-amber-500/60 bg-amber-500/10 dark:bg-amber-500/15 p-4 sm:p-5 space-y-3 scroll-mt-24"
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/20 shrink-0">
+                  <Target className="text-amber-700 dark:text-amber-400" size={22} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    Objectif sur l’accueil athlète
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                    S’affiche à côté des <strong>calories</strong> dans la section <strong>OBJECTIF</strong> de l’app athlète (pas confondre avec le plan kcal/macros ci‑dessous). Ex. : perte de poids, prise de masse, santé.
+                  </p>
+                </div>
+              </div>
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-900/80 dark:text-amber-200/90">
+                Texte objectif
+              </label>
+              <textarea
+                value={profileForm.objectives}
+                onChange={(e) => setProfileForm((f) => ({ ...f, objectives: e.target.value }))}
+                placeholder="Ex. Perte de poids · Prise de masse · Remise en forme / santé"
+                rows={3}
+                className="w-full bg-white dark:bg-slate-900 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-amber-500 border border-amber-500/30 dark:border-amber-500/40 resize-y min-h-[88px]"
+              />
+              <button
+                type="button"
+                onClick={() => void handleSaveAthleteObjective()}
+                disabled={savingAthleteObjective}
+                className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-sm font-bold disabled:opacity-50 transition-colors"
+              >
+                {savingAthleteObjective ? 'Enregistrement…' : 'Enregistrer l’objectif'}
+              </button>
+            </div>
+          )}
+
           {nutritionPlan ? (
             <div className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-200 dark:border-slate-800">
               <h4 className="font-bold">{nutritionPlan.title || 'Plan nutritionnel'}</h4>
