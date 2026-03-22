@@ -196,7 +196,7 @@ export async function createWorkout(workoutData: any) {
 export async function fetchNutritionPlan(athleteId: string) {
   const { data, error } = await supabase
     .from('nutrition_plans')
-    .select('*, meals(*)')
+    .select('*')
     .eq('athlete_id', athleteId);
 
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
