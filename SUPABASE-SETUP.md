@@ -57,7 +57,8 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 
 **Fichier : `supabase_rls_safe.sql`**
 
-- Crée la table **messages** et active les politiques RLS sur toutes les tables (users, workouts, exercises, nutrition_plans, meals, progress_logs, calendar_events, messages).
+- Crée la table **messages** et active les politiques RLS sur les tables concernées (sans `meals`).
+- Ajoute le droit d’**INSERT** (et `GRANT`) sur **sa propre ligne `users`** pour la messagerie.
 
 ### Étape 3 : Migrations métier (dans l’ordre)
 
@@ -65,7 +66,10 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 |-------|---------|------|
 | 1 | `supabase_migration_coach_and_profile.sql` | Colonnes `coach_id`, profil (poids, taille, âge, objectifs, risques), RLS users coach/athlète |
 | 2 | `supabase_migration_link_athlete.sql` | RLS : coach peut lier un athlète (par email) |
-| 3 | `supabase_migration_messages_partners.sql` | RLS : lecture des correspondants (nom/avatar dans Messages) |
+| 3 | `supabase_migration_messages_partners.sql` | RLS messagerie + athlète → coach (via fonction `ofcoach_my_coach_id`, sans récursion sur `users`) |
+| — | `supabase_migration_restore_coach_sees_athletes.sql` | **Dépannage** : si la liste clients est vide, rétablit la policy coach → athlètes (`coach_id`) |
+| — | **`supabase_migration_sync_auth_users.sql`** | **Messagerie** : copie `auth.users` → `public.users`, policy INSERT, trigger |
+| — | **`supabase_rpc_ensure_current_user_in_users.sql`** | **Messagerie** : fonction RPC appelée par l’app pour créer la ligne `users` même si l’INSERT client est bloqué (à exécuter après le script sync) |
 | 4 | `supabase_migration_progress_logs.sql` | Table `progress_logs` si absente + RLS (optionnel si déjà dans le schéma) |
 | 5 | `supabase_migration_progress_logs_add_body_fat.sql` | Colonnes `body_fat` et `notes` sur `progress_logs` |
 | 6 | `supabase_migration_workout_athlete_update.sql` | RLS : athlète peut mettre à jour sa séance (ex. marquer terminée) |
@@ -88,6 +92,22 @@ ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 ```
 
 (Uniquement si la table `messages` existe déjà.)
+
+### Liste des clients vide (coach)
+
+1. Dans **SQL Editor**, exécuter **`supabase_migration_restore_coach_sees_athletes.sql`** (rétablit la lecture des athlètes liés par `coach_id`).
+2. Ré-exécuter **`supabase_migration_messages_partners.sql`** (version à jour : plus de récursion RLS sur `users`).
+3. Dans **Table Editor → users**, vérifier que tes athlètes ont **`coach_id`** = l’**id** (UUID) du coach (colonne `id` de la ligne du coach).
+
+### Messagerie — si l’alerte « profil non synchronisé » apparaît
+
+1. Exécuter **`supabase_migration_sync_auth_users.sql`** (projet Supabase = URL dans Vercel).
+2. Exécuter **`supabase_rpc_ensure_current_user_in_users.sql`** — **sans ce fichier, l’alerte « profil non synchronisé » peut revenir** malgré l’étape 1.
+3. Ré-exécuter **`supabase_migration_messages_partners.sql`** (version à jour).
+4. Vérifier **`supabase_migration_coach_and_profile.sql`** (`coach_id`).
+5. Rafraîchir l’app, réessayer d’envoyer un message.
+
+Si le trigger sur `auth.users` échoue au `CREATE TRIGGER` (rare selon la version Postgres), ouvre `supabase_migration_sync_auth_users.sql` et remplace la dernière ligne `EXECUTE PROCEDURE` par `EXECUTE FUNCTION` puis relance uniquement ce bloc.
 
 ---
 

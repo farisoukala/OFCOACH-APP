@@ -8,6 +8,14 @@ DROP POLICY IF EXISTS "Public users are viewable by everyone" ON public.users;
 CREATE POLICY "Authenticated can read users"
   ON public.users FOR SELECT TO authenticated USING (true);
 
+-- Messagerie : chaque compte peut créer / mettre à jour sa propre ligne dans public.users
+-- (complété par supabase_migration_sync_auth_users.sql : backfill + trigger auth)
+GRANT SELECT, INSERT, UPDATE ON public.users TO authenticated;
+DROP POLICY IF EXISTS "Users can insert own row" ON public.users;
+CREATE POLICY "Users can insert own row"
+  ON public.users FOR INSERT TO authenticated
+  WITH CHECK ((id)::uuid = auth.uid());
+
 -- ---------- WORKOUTS (si la table existe) ----------
 DO $$
 BEGIN

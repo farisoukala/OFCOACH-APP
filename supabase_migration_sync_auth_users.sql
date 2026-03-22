@@ -5,9 +5,8 @@
 -- Auth doit avoir une ligne dans public.users pour pouvoir envoyer des messages.
 -- ============================================================
 
--- 0) Donner le droit d'insertion sur public.users au rôle authenticated (obligatoire pour que l'app puisse créer la ligne)
-GRANT INSERT ON public.users TO authenticated;
-GRANT SELECT ON public.users TO authenticated;
+-- 0) Droits table (upsert côté app = INSERT + UPDATE sur sa ligne)
+GRANT SELECT, INSERT, UPDATE ON public.users TO authenticated;
 
 -- 1) Insérer dans public.users tous les utilisateurs Auth qui n'y sont pas encore
 --    (email rendu unique : si déjà pris par un autre user, on met id@auth.local)
@@ -35,7 +34,11 @@ CREATE POLICY "Users can insert own row"
 
 -- 3) Trigger : à chaque nouvel utilisateur Auth, créer automatiquement la ligne dans public.users
 CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   INSERT INTO public.users (id, name, email, role, avatar, status)
   VALUES (
@@ -49,10 +52,16 @@ BEGIN
   ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 DROP TRIGGER IF EXISTS on_auth_user_created_sync_public_users ON auth.users;
 CREATE TRIGGER on_auth_user_created_sync_public_users
   AFTER INSERT ON auth.users
   FOR EACH ROW
-  EXECUTE FUNCTION public.handle_new_auth_user();
+  EXECUTE PROCEDURE public.handle_new_auth_user();
+
+-- Si Postgres renvoie une erreur sur EXECUTE PROCEDURE, remplace la ligne ci‑dessus par :
+--   EXECUTE FUNCTION public.handle_new_auth_user();
+
+-- 4) Ensuite exécuter aussi supabase_rpc_ensure_current_user_in_users.sql
+--    (l’app l’appelle avant d’envoyer un message : contourne les blocages RLS côté navigateur).

@@ -236,23 +236,84 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const ensureCurrentUserInDb = async (): Promise<boolean> => {
     const authUser = user ?? (await supabase.auth.getUser()).data.user ?? null;
     if (!authUser) return false;
-    const fallback = buildAppUserFromAuth(authUser);
+
     try {
-      const { error } = await supabase.from('users').upsert(
-        {
-          id: authUser.id,
-          name: fallback.name ?? fallback.email.split('@')[0],
-          email: authUser.email ?? '',
-          role: fallback.role ?? 'athlete',
-        },
-        { onConflict: 'id' }
-      );
-      if (error) return false;
-    } catch {
+      // 1) RPC côté base (SECURITY DEFINER) : fonctionne même si l’INSERT client est bloqué par la RLS
+      const { data: rpcOk, error: rpcErr } = await supabase.rpc('ensure_current_user_in_users');
+      const rpcMissing =
+        rpcErr &&
+        (/function|schema cache|not found|42883|PGRST202/i.test(String(rpcErr.message || '')) ||
+          (rpcErr as { code?: string }).code === '42883');
+      if (rpcErr && !rpcMissing) {
+        console.error('ensureCurrentUserInDb rpc', rpcErr);
+      }
+      if (!rpcErr && rpcOk === true) {
+        await loadProfile(authUser);
+        return true;
+      }
+    } catch (e) {
+      console.error('ensureCurrentUserInDb rpc catch', e);
+    }
+
+    const fallback = buildAppUserFromAuth(authUser);
+    const rawEmail = (authUser.email ?? '').trim();
+    const safeEmail =
+      rawEmail ||
+      `${authUser.id}@auth.local`;
+    const displayName =
+      (fallback.name && fallback.name.trim()) ||
+      (rawEmail ? rawEmail.split('@')[0] : 'Utilisateur');
+    const role = fallback.role ?? 'athlete';
+
+    try {
+      const { data: existing, error: selErr } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', authUser.id)
+        .maybeSingle();
+      if (selErr) {
+        console.error('ensureCurrentUserInDb select', selErr);
+      }
+      if (existing?.id) return true;
+
+      const row = {
+        id: authUser.id,
+        name: displayName,
+        email: safeEmail,
+        role,
+      };
+
+      const { error: upErr } = await supabase.from('users').upsert(row, { onConflict: 'id' });
+      if (!upErr) {
+        const { data: check } = await supabase.from('users').select('id').eq('id', authUser.id).maybeSingle();
+        return !!check?.id;
+      }
+
+      console.error('ensureCurrentUserInDb upsert', upErr);
+
+      // Conflit email unique : réessayer avec un email dérivé de l’id
+      if (upErr.code === '23505' && /email/i.test(String(upErr.message || upErr.details || ''))) {
+        const { error: ins2 } = await supabase.from('users').insert({
+          ...row,
+          email: `${authUser.id}@auth.local`,
+        });
+        if (!ins2) return true;
+        console.error('ensureCurrentUserInDb insert fallback email', ins2);
+        return false;
+      }
+
+      const { error: insErr } = await supabase.from('users').insert(row);
+      if (!insErr) return true;
+      if (insErr.code === '23505') {
+        const { data: check2 } = await supabase.from('users').select('id').eq('id', authUser.id).maybeSingle();
+        return !!check2?.id;
+      }
+      console.error('ensureCurrentUserInDb insert', insErr);
+      return false;
+    } catch (e) {
+      console.error('ensureCurrentUserInDb', e);
       return false;
     }
-    const { data } = await supabase.from('users').select('id').eq('id', authUser.id).single();
-    return !!data;
   };
 
   const updatePassword = async (currentPassword: string, newPassword: string): Promise<{ error: string | null }> => {

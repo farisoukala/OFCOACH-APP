@@ -221,9 +221,10 @@ export const Messages: React.FC<MessagesProps> = ({
   const showSyncError = () => {
     alert(
       'Votre profil n\'est pas synchronisé avec la base de données.\n\n' +
-      '1. Ouvrez le projet Supabase utilisé par cette app (celui dont l\'URL est dans les variables d\'environnement Vercel).\n' +
-      '2. Allez dans SQL Editor et exécutez tout le script "supabase_migration_sync_auth_users.sql".\n' +
-      '3. Rafraîchissez cette page puis réessayez.'
+      'Dans Supabase → SQL Editor (même projet que l’URL Vercel), exécutez DANS L’ORDRE :\n\n' +
+      '1) supabase_migration_sync_auth_users.sql\n' +
+      '2) supabase_rpc_ensure_current_user_in_users.sql  ← indispensable pour la messagerie\n\n' +
+      'Puis rafraîchissez la page et réessayez d’envoyer un message.'
     );
   };
 
