@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
 import { 
   Bell, 
   Home,
@@ -7,11 +7,11 @@ import {
   TrendingUp,
   MessageCircle,
   User,
-  Clock,
+  Target,
   LogOut,
   Calendar,
 } from 'lucide-react';
-import { fetchWorkoutsByAthlete, fetchNutritionPlan, fetchAthleteAppointments } from '../services/api';
+import { fetchWorkoutsByAthlete, fetchNutritionPlan, fetchAthleteAppointments, fetchClientById } from '../services/api';
 import { pickFeaturedWorkout, localTodayIso } from '../lib/workoutPlanning';
 
 const Progress = lazy(() => import('./Progress').then((m) => ({ default: m.Progress })));
@@ -37,6 +37,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [nutrition, setNutrition] = useState<any>(null);
   const [coachAppointments, setCoachAppointments] = useState<any[]>([]);
+  const [coachingObjective, setCoachingObjective] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const { appUser, signOut } = useAuth();
   const athleteId = appUser?.id;
@@ -50,14 +51,17 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
         return;
       }
       try {
-        const [workoutsData, nutritionData, appts] = await Promise.all([
+        const [workoutsData, nutritionData, appts, userRow] = await Promise.all([
           fetchWorkoutsByAthlete(athleteId),
           fetchNutritionPlan(athleteId),
           fetchAthleteAppointments(athleteId).catch(() => [] as any[]),
+          fetchClientById(athleteId).catch(() => null),
         ]);
         setWorkouts(workoutsData);
         setNutrition(nutritionData);
         setCoachAppointments(appts || []);
+        const o = userRow?.objectives;
+        setCoachingObjective(typeof o === 'string' && o.trim() ? o.trim() : null);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
@@ -66,6 +70,19 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
     };
     loadData();
   }, [athleteId]);
+
+  const prevTabRef = useRef<Tab>(activeTab);
+  useEffect(() => {
+    const prev = prevTabRef.current;
+    prevTabRef.current = activeTab;
+    if (!athleteId || activeTab !== 'accueil' || prev === 'accueil') return;
+    void fetchClientById(athleteId)
+      .then((row) => {
+        const ob = row?.objectives;
+        setCoachingObjective(typeof ob === 'string' && ob.trim() ? ob.trim() : null);
+      })
+      .catch(() => {});
+  }, [activeTab, athleteId]);
 
   const featuredWorkout = pickFeaturedWorkout(workouts);
   const todayIso = localTodayIso();
@@ -184,31 +201,34 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
             )}
 
             <section>
-              <h2 className="text-lg font-bold mb-4">Statistiques récentes</h2>
+              <h2 className="text-lg font-bold mb-4 tracking-wide">OBJECTIF</h2>
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-200 dark:bg-slate-800 p-4 rounded-2xl border border-transparent dark:border-slate-700">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="p-2 bg-orange-500/10 rounded-lg">
                       <TrendingUp className="text-orange-500" size={20} />
                     </div>
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Objectif Cal.</span>
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Objectif calories</span>
                   </div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold tracking-tight">{nutrition?.calories_target || '--'}</span>
+                    <span className="text-2xl font-bold tracking-tight">{nutrition?.calories_target ?? '--'}</span>
                     <span className="text-xs text-slate-500">kcal</span>
                   </div>
                 </div>
-                <div className="bg-slate-200 dark:bg-slate-800 p-4 rounded-2xl border border-transparent dark:border-slate-700">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-2 bg-blue-500/10 rounded-lg">
-                      <Clock className="text-blue-500" size={20} />
+                <div className="bg-slate-200 dark:bg-slate-800 p-4 rounded-2xl border border-transparent dark:border-slate-700 min-h-[108px] flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-emerald-500/10 rounded-lg shrink-0">
+                      <Target className="text-emerald-600 dark:text-emerald-400" size={20} />
                     </div>
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Activité</span>
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Objectif coach</span>
                   </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold tracking-tight">185</span>
-                    <span className="text-xs text-slate-500">min</span>
-                  </div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-4">
+                    {coachingObjective || (
+                      <span className="font-medium text-slate-500 dark:text-slate-400">
+                        Non défini — ton coach peut l’indiquer dans ton profil (ex. perte de poids, prise de masse, santé).
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
             </section>
