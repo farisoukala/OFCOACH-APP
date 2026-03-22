@@ -183,9 +183,13 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
         </button>
         <div className="text-center flex-1">
           <h1 className="text-xl font-bold tracking-tight">Planning</h1>
-          {isAthlete && (
+          {showAthletePlanningHint ? (
             <p className="text-[10px] text-slate-500 font-medium mt-0.5 px-2">
               Rendez-vous coach + tes événements perso
+            </p>
+          ) : (
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5 px-2">
+              Ton planning personnel (les RDV athlètes se gèrent dans chaque fiche client)
             </p>
           )}
         </div>
