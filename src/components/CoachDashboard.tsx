@@ -30,6 +30,7 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
   onNavigateToMessages,
   onNavigateToCalendar,
   onNavigateToSettings,
+  onOpenClientProfile,
 }) => {
   const [recentClients, setRecentClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,8 +158,15 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
                 key={client.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => onOpenClientProfile?.(client.id)}
-                onKeyDown={(e) => e.key === 'Enter' && onOpenClientProfile?.(client.id)}
+                onClick={() => {
+                  if (onOpenClientProfile) onOpenClientProfile(client.id);
+                  else onNavigateToClients();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  if (onOpenClientProfile) onOpenClientProfile(client.id);
+                  else onNavigateToClients();
+                }}
                 className="flex items-center p-4 bg-white dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/30 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer group"
               >
                 <div className="relative">
