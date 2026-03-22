@@ -127,13 +127,14 @@ export async function fetchWorkoutsByAthlete(athleteId: string) {
     .from('workouts')
     .select('*, exercises(*)')
     .eq('athlete_id', athleteId)
+    .order('date', { ascending: true, nullsFirst: false })
     .order('created_at', { ascending: false });
 
   if (error) throw error;
   return data || [];
 }
 
-export async function updateWorkout(workoutId: string, updates: { status?: string }) {
+export async function updateWorkout(workoutId: string, updates: { status?: string; date?: string | null }) {
   // Cas principal côté athlète: terminer sa séance.
   // On passe par RPC pour éviter les blocages RLS UPDATE selon les environnements.
   if (updates.status === 'completed') {

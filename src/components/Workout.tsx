@@ -9,10 +9,20 @@ import {
 } from 'lucide-react';
 import { fetchWorkoutsByAthlete, updateWorkout } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import {
+  pickFeaturedWorkout,
+  sortWorkoutsBySchedule,
+  startOfWeekMonday,
+  addDaysLocal,
+  localDateIso,
+  localTodayIso,
+} from '../lib/workoutPlanning';
 
 function formatWorkoutDate(dateStr: string | null): string {
   if (!dateStr) return '—';
-  const d = new Date(dateStr);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+    ? new Date(dateStr + 'T12:00:00')
+    : new Date(dateStr);
   const now = new Date();
   const today = now.toDateString() === d.toDateString();
   const yesterday = new Date(now);
@@ -49,9 +59,19 @@ export const Workout: React.FC = () => {
     loadWorkouts();
   }, [athleteId, loadWorkouts]);
 
-  const pendingWorkouts = workouts.filter((w) => w.status !== 'completed');
-  const currentWorkout = pendingWorkouts[0] ?? workouts[0];
+  const sortedList = sortWorkoutsBySchedule(workouts);
+  const currentWorkout = pickFeaturedWorkout(workouts);
   const completedCount = workouts.filter((w) => w.status === 'completed').length;
+
+  const monday = startOfWeekMonday();
+  const weekDays = [0, 1, 2, 3, 4, 5, 6].map((i) => {
+    const d = addDaysLocal(monday, i);
+    const iso = localDateIso(d);
+    const label = d.toLocaleDateString('fr-FR', { weekday: 'short' });
+    const dayWorkouts = workouts.filter((w) => w.date === iso);
+    return { iso, label, dayNum: d.getDate(), dayWorkouts };
+  });
+  const todayIso = localTodayIso();
 
   const handleMarkCompleted = async (workoutId: string) => {
     if (markingId) return;
@@ -88,6 +108,42 @@ export const Workout: React.FC = () => {
             </div>
             <p className="text-2xl font-bold">{completedCount} <span className="text-sm font-normal text-slate-500">/ {workouts.length}</span></p>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-bold mb-3">Planning de la semaine</h2>
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+          {weekDays.map((day) => (
+            <div
+              key={day.iso}
+              className={`min-w-[100px] shrink-0 rounded-2xl p-3 border ${
+                day.iso === todayIso
+                  ? 'bg-primary/15 border-primary/40 ring-1 ring-primary/30'
+                  : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+              }`}
+            >
+              <p className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">{day.label}</p>
+              <p className="text-lg font-extrabold leading-tight">{day.dayNum}</p>
+              <div className="mt-2 space-y-1">
+                {day.dayWorkouts.length === 0 ? (
+                  <p className="text-[10px] text-slate-400">—</p>
+                ) : (
+                  day.dayWorkouts.map((w: any) => (
+                    <p
+                      key={w.id}
+                      className={`text-[10px] font-semibold truncate ${
+                        w.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400 line-through opacity-80' : 'text-slate-700 dark:text-slate-200'
+                      }`}
+                      title={w.title}
+                    >
+                      {w.title}
+                    </p>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -159,14 +215,14 @@ export const Workout: React.FC = () => {
       </section>
 
       <section>
-        <h2 className="text-lg font-bold mb-4">Historique</h2>
-        {workouts.length === 0 ? (
+        <h2 className="text-lg font-bold mb-4">Toutes les séances</h2>
+        {sortedList.length === 0 ? (
           <div className="bg-slate-100 dark:bg-slate-900 p-8 rounded-2xl text-center text-slate-500 text-sm">
             Aucune séance dans l'historique.
           </div>
         ) : (
           <div className="space-y-3">
-            {workouts.map((w) => (
+            {sortedList.map((w) => (
               <div
                 key={w.id}
                 className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl"

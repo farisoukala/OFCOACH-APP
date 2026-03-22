@@ -11,6 +11,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { fetchWorkoutsByAthlete, fetchNutritionPlan } from '../services/api';
+import { pickFeaturedWorkout, localTodayIso } from '../lib/workoutPlanning';
 
 const Progress = lazy(() => import('./Progress').then((m) => ({ default: m.Progress })));
 const Nutrition = lazy(() => import('./Nutrition').then((m) => ({ default: m.Nutrition })));
@@ -27,7 +28,7 @@ interface AthleteDashboardProps {
 
 export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateToMessages, onNavigateToNotifications }) => {
   const [activeTab, setActiveTab] = useState<Tab>('accueil');
-  const [workout, setWorkout] = useState<any>(null);
+  const [workouts, setWorkouts] = useState<any[]>([]);
   const [nutrition, setNutrition] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { appUser, signOut } = useAuth();
@@ -46,7 +47,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
           fetchWorkoutsByAthlete(athleteId),
           fetchNutritionPlan(athleteId)
         ]);
-        setWorkout(workoutsData[0]);
+        setWorkouts(workoutsData);
         setNutrition(nutritionData);
       } catch (error) {
         console.error('Error loading dashboard data:', error);
@@ -56,6 +57,9 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
     };
     loadData();
   }, [athleteId]);
+
+  const featuredWorkout = pickFeaturedWorkout(workouts);
+  const todayIso = localTodayIso();
 
   const renderContent = () => {
     switch (activeTab) {
@@ -69,7 +73,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
                   {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })}
                 </span>
               </div>
-              {workout ? (
+              {featuredWorkout ? (
                 <div className="relative overflow-hidden rounded-2xl group shadow-2xl">
                   <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/40 to-transparent z-10"></div>
                   <img 
@@ -83,8 +87,24 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({ onNavigateTo
                       <Dumbbell className="text-primary" size={14} />
                       <p className="text-primary text-sm font-bold uppercase tracking-widest">Force & Puissance</p>
                     </div>
-                    <h3 className="text-2xl font-extrabold text-white mb-1">{workout.title}</h3>
-                    <p className="text-slate-300 text-sm mb-4">{workout.exercises?.length || 0} exercices • Intensité Élevée</p>
+                    <h3 className="text-2xl font-extrabold text-white mb-1">{featuredWorkout.title}</h3>
+                    <p className="text-slate-300 text-sm mb-1">
+                      {featuredWorkout.exercises?.length || 0} exercices
+                      {featuredWorkout.date && (
+                        <>
+                          {' '}
+                          ·{' '}
+                          {String(featuredWorkout.date) === todayIso
+                            ? "Prévue aujourd'hui"
+                            : new Date(featuredWorkout.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'short',
+                              })}
+                        </>
+                      )}
+                    </p>
+                    <p className="text-slate-400 text-xs mb-4">Voir l’onglet Entraînement pour le planning de la semaine.</p>
                     <button 
                       onClick={() => setActiveTab('workout')}
                       className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-all active:scale-95"

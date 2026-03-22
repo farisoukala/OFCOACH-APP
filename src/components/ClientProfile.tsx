@@ -17,7 +17,8 @@ import {
   MessageSquare,
   Utensils
 } from 'lucide-react';
-import { createWorkout, fetchClientById, updateUserProfile, fetchNutritionPlan, createNutritionPlan, addMealToPlan, createNotification, fetchBodyMeasurementSnapshots } from '../services/api';
+import { createWorkout, fetchClientById, updateUserProfile, fetchNutritionPlan, createNutritionPlan, addMealToPlan, createNotification, fetchBodyMeasurementSnapshots, fetchWorkoutsByAthlete, updateWorkout } from '../services/api';
+import { localTodayIso, nextOccurrenceJsWeekday, sortWorkoutsBySchedule, weekdayLabelFrFromIso } from '../lib/workoutPlanning';
 import { useAuth } from '../context/AuthContext';
 import { upsertBodyMeasurementSnapshot } from '../services/api';
 import { AreaChart, Area, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
@@ -81,13 +82,17 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [nutritionForm, setNutritionForm] = useState({ title: 'Plan du jour', date: '', calories_target: 2000, protein_target: 150, carbs_target: 250, fat_target: 70 });
   const [nutritionMeals, setNutritionMeals] = useState<{ name: string; calories: string; protein: string; carbs: string; fat: string; time: string }[]>([{ name: '', calories: '', protein: '', carbs: '', fat: '', time: '12:00' }]);
   const [workoutFormError, setWorkoutFormError] = useState<string | null>(null);
+  const [workoutScheduledDate, setWorkoutScheduledDate] = useState(() => localTodayIso());
+  const [clientWorkouts, setClientWorkouts] = useState<any[]>([]);
+  const [workoutsLoading, setWorkoutsLoading] = useState(false);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [nutritionFormError, setNutritionFormError] = useState<string | null>(null);
   const [measurementSnapshots, setMeasurementSnapshots] = useState<any[]>([]);
   const [measurementMetric, setMeasurementMetric] = useState<
     'taille_cm' | 'tour_poitrine_cm' | 'tour_ventre_cm' | 'tour_hanche_cm' | 'tour_bras_cm' | 'tour_epaule_cm' | 'tour_mollet_cm'
   >('tour_ventre_cm');
   const { appUser } = useAuth();
-  const todayIso = new Date().toISOString().split('T')[0];
+  const todayIso = localTodayIso();
   const [measurementDate, setMeasurementDate] = useState<string>(todayIso);
 
   useEffect(() => {
@@ -127,6 +132,18 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     fetchNutritionPlan(selectedClientId)
       .then(setNutritionPlan)
       .catch(() => setNutritionPlan(null));
+  }, [selectedClientId]);
+
+  useEffect(() => {
+    if (!selectedClientId) {
+      setClientWorkouts([]);
+      return;
+    }
+    setWorkoutsLoading(true);
+    fetchWorkoutsByAthlete(selectedClientId)
+      .then((list) => setClientWorkouts(sortWorkoutsBySchedule(list)))
+      .catch(() => setClientWorkouts([]))
+      .finally(() => setWorkoutsLoading(false));
   }, [selectedClientId]);
 
   useEffect(() => {
@@ -219,6 +236,23 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     setExercises(exercises.map(ex => ex.id === id ? { ...ex, [field]: value } : ex));
   };
 
+  const handleRescheduleWorkout = async (workoutId: string, newDate: string) => {
+    if (!newDate) return;
+    setReschedulingId(workoutId);
+    try {
+      await updateWorkout(workoutId, { date: newDate });
+      if (selectedClientId) {
+        const list = await fetchWorkoutsByAthlete(selectedClientId);
+        setClientWorkouts(sortWorkoutsBySchedule(list));
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Impossible de modifier la date de la séance (droits ou réseau).');
+    } finally {
+      setReschedulingId(null);
+    }
+  };
+
   const handleCreateWorkout = async () => {
     setWorkoutFormError(null);
     if (!workoutTitle.trim()) {
@@ -235,7 +269,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         coach_id: appUser.id,
         title: workoutTitle,
         description: workoutDesc,
-        date: new Date().toISOString().split('T')[0],
+        date: workoutScheduledDate || localTodayIso(),
         exercises
       });
       try {
@@ -245,10 +279,13 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
           body: workoutTitle,
         });
       } catch (_) { /* notification optionnelle */ }
+      const list = await fetchWorkoutsByAthlete(selectedClientId);
+      setClientWorkouts(sortWorkoutsBySchedule(list));
       setShowWorkoutModal(false);
       setWorkoutTitle('');
       setWorkoutDesc('');
       setExercises([]);
+      setWorkoutScheduledDate(localTodayIso());
       setWorkoutFormError(null);
       alert('Séance créée avec succès !');
     } catch (error: any) {
@@ -576,23 +613,74 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
               Programmation
             </h3>
             <button 
-              onClick={() => { setWorkoutFormError(null); setShowWorkoutModal(true); }}
+              onClick={() => {
+                setWorkoutFormError(null);
+                setWorkoutScheduledDate(localTodayIso());
+                setShowWorkoutModal(true);
+              }}
               className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
             >
               <Plus size={16} />
               Nouvelle séance
             </button>
           </div>
-          
-          <div className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-5 border border-slate-200 dark:border-slate-800">
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Dernière séance assignée :</p>
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-bold">Haut du corps - Élite</h4>
-                <p className="text-xs text-slate-500">Assignée le 12 Oct. 2024</p>
+
+          <div className="space-y-3">
+            {workoutsLoading ? (
+              <div className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-8 text-center text-slate-500 text-sm border border-slate-200 dark:border-slate-800">
+                Chargement du planning…
               </div>
-              <button className="text-primary font-bold text-sm">Détails</button>
-            </div>
+            ) : clientWorkouts.length === 0 ? (
+              <div className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-8 text-center text-slate-500 text-sm border border-dashed border-slate-300 dark:border-slate-700">
+                Aucune séance planifiée. Ajoute-en une avec la date du jour souhaité.
+              </div>
+            ) : (
+              clientWorkouts.map((w) => (
+                <div
+                  key={w.id}
+                  className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h4 className="font-bold truncate">{w.title}</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        {w.date
+                          ? `${weekdayLabelFrFromIso(w.date)} · ${new Date(w.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}`
+                          : 'Date non définie'}
+                        {w.status === 'completed' ? ' · Terminée' : ''}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 text-[10px] font-bold uppercase px-2 py-1 rounded-lg ${
+                        w.status === 'completed'
+                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-primary/15 text-primary'
+                      }`}
+                    >
+                      {w.status === 'completed' ? 'Fait' : 'À faire'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Reporter au</label>
+                    <input
+                      type="date"
+                      value={w.date && /^\d{4}-\d{2}-\d{2}$/.test(String(w.date)) ? String(w.date) : ''}
+                      disabled={reschedulingId === w.id}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v) void handleRescheduleWorkout(w.id, v);
+                      }}
+                      className="bg-white dark:bg-slate-700 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                    />
+                    {reschedulingId === w.id && <span className="text-xs text-slate-500">…</span>}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </section>
 
@@ -690,6 +778,37 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                     placeholder="Instructions spécifiques..."
                     className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl p-4 outline-none focus:ring-2 focus:ring-primary transition-all h-24 resize-none"
                   />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Jour de la séance</label>
+                  <input
+                    type="date"
+                    value={workoutScheduledDate}
+                    onChange={(e) => setWorkoutScheduledDate(e.target.value)}
+                    className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl p-4 outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Ou choisir le prochain jour de la semaine :</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: 'Lun', js: 1 },
+                      { label: 'Mar', js: 2 },
+                      { label: 'Mer', js: 3 },
+                      { label: 'Jeu', js: 4 },
+                      { label: 'Ven', js: 5 },
+                      { label: 'Sam', js: 6 },
+                      { label: 'Dim', js: 0 },
+                    ].map(({ label, js }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => setWorkoutScheduledDate(nextOccurrenceJsWeekday(js))}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-primary/20 hover:text-primary transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-4">
