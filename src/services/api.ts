@@ -467,6 +467,31 @@ export async function deleteAthleteAppointment(appointmentId: string) {
   if (error) throw error;
 }
 
+export type AthleteAppointmentUpdate = {
+  title?: string;
+  notes?: string | null;
+  starts_at?: string;
+  duration_minutes?: number;
+};
+
+export async function updateAthleteAppointment(appointmentId: string, updates: AthleteAppointmentUpdate) {
+  const payload: Record<string, unknown> = {};
+  if (updates.title !== undefined) payload.title = updates.title.trim();
+  if (updates.notes !== undefined) payload.notes = updates.notes?.trim() ? updates.notes.trim() : null;
+  if (updates.starts_at !== undefined) payload.starts_at = updates.starts_at;
+  if (updates.duration_minutes !== undefined) payload.duration_minutes = updates.duration_minutes;
+
+  const { data, error } = await supabase
+    .from('athlete_appointments')
+    .update(payload)
+    .eq('id', appointmentId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function fetchNotifications(userId: string) {
   const { data, error } = await supabase
     .from('notifications')

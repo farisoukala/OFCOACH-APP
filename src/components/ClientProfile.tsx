@@ -11,6 +11,7 @@ import {
   Dumbbell,
   X,
   Trash2,
+  Pencil,
   Activity,
   HeartPulse,
   MoreVertical,
@@ -31,6 +32,7 @@ import {
   updateWorkout,
   fetchAthleteAppointments,
   createAthleteAppointment,
+  updateAthleteAppointment,
   deleteAthleteAppointment,
 } from '../services/api';
 import { localTodayIso, nextOccurrenceJsWeekday, sortWorkoutsBySchedule, weekdayLabelFrFromIso } from '../lib/workoutPlanning';
@@ -52,6 +54,20 @@ function combineLocalDateTimeToIso(date: string, time: string): string {
   const d = new Date(`${date}T${t}`);
   if (Number.isNaN(d.getTime())) throw new Error('Date ou heure invalide.');
   return d.toISOString();
+}
+
+/** ISO Supabase → champs date / heure locaux pour les inputs. */
+function splitIsoToLocalDateTime(iso: string): { date: string; time: string } {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    return { date: localTodayIso(), time: '10:00' };
+  }
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return { date: `${y}-${m}-${day}`, time: `${h}:${min}` };
 }
 
 const formatSupabaseError = (err: any, fallback: string) => {
@@ -121,6 +137,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     duration_minutes: 60,
     notes: '',
   });
+  const [editingAppointmentId, setEditingAppointmentId] = useState<string | null>(null);
   const [nutritionFormError, setNutritionFormError] = useState<string | null>(null);
   const [measurementSnapshots, setMeasurementSnapshots] = useState<any[]>([]);
   const [measurementMetric, setMeasurementMetric] = useState<
@@ -283,7 +300,42 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     setExercises(exercises.map(ex => ex.id === id ? { ...ex, [field]: value } : ex));
   };
 
-  const handleCreateAppointment = async () => {
+  const closeAppointmentModal = () => {
+    if (appointmentSaving) return;
+    setShowAppointmentModal(false);
+    setEditingAppointmentId(null);
+    setAppointmentFormError(null);
+  };
+
+  const openNewAppointmentModal = () => {
+    setAppointmentFormError(null);
+    setEditingAppointmentId(null);
+    setAppointmentForm({
+      title: '',
+      date: localTodayIso(),
+      time: '10:00',
+      duration_minutes: 60,
+      notes: '',
+    });
+    setShowAppointmentModal(true);
+  };
+
+  const openEditAppointmentModal = (a: { id: string; title?: string; starts_at?: string; duration_minutes?: number | null; notes?: string | null }) => {
+    if (!a.starts_at) return;
+    const { date, time } = splitIsoToLocalDateTime(a.starts_at);
+    setAppointmentFormError(null);
+    setEditingAppointmentId(a.id);
+    setAppointmentForm({
+      title: a.title ?? '',
+      date,
+      time,
+      duration_minutes: a.duration_minutes ?? 60,
+      notes: a.notes ?? '',
+    });
+    setShowAppointmentModal(true);
+  };
+
+  const handleSaveAppointment = async () => {
     setAppointmentFormError(null);
     if (!appointmentForm.title.trim()) {
       setAppointmentFormError('Indique un titre pour le rendez-vous.');
@@ -301,29 +353,54 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       setAppointmentFormError('Date ou heure invalide.');
       return;
     }
+    const duration = Math.max(15, Number(appointmentForm.duration_minutes) || 60);
     setAppointmentSaving(true);
     try {
-      await createAthleteAppointment(selectedClientId, appUser.id, {
-        title: appointmentForm.title.trim(),
-        notes: appointmentForm.notes.trim() || null,
-        starts_at: startsAt,
-        duration_minutes: Math.max(15, Number(appointmentForm.duration_minutes) || 60),
-      });
-      try {
-        await createNotification(selectedClientId, {
-          type: 'appointment',
-          title: 'Nouveau rendez-vous',
-          body: `${appointmentForm.title.trim()} — ${new Date(startsAt).toLocaleString('fr-FR', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          })}`,
+      if (editingAppointmentId) {
+        await updateAthleteAppointment(editingAppointmentId, {
+          title: appointmentForm.title.trim(),
+          notes: appointmentForm.notes.trim() || null,
+          starts_at: startsAt,
+          duration_minutes: duration,
         });
-      } catch {
-        /* optionnel */
+        try {
+          await createNotification(selectedClientId, {
+            type: 'appointment',
+            title: 'Rendez-vous modifié',
+            body: `${appointmentForm.title.trim()} — ${new Date(startsAt).toLocaleString('fr-FR', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}`,
+          });
+        } catch {
+          /* optionnel */
+        }
+        alert('Rendez-vous mis à jour. L’athlète verra le changement dans son planning.');
+      } else {
+        await createAthleteAppointment(selectedClientId, appUser.id, {
+          title: appointmentForm.title.trim(),
+          notes: appointmentForm.notes.trim() || null,
+          starts_at: startsAt,
+          duration_minutes: duration,
+        });
+        try {
+          await createNotification(selectedClientId, {
+            type: 'appointment',
+            title: 'Nouveau rendez-vous',
+            body: `${appointmentForm.title.trim()} — ${new Date(startsAt).toLocaleString('fr-FR', {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })}`,
+          });
+        } catch {
+          /* optionnel */
+        }
+        alert('Rendez-vous enregistré. L’athlète le verra dans son Planning.');
       }
       const list = await fetchAthleteAppointments(selectedClientId);
       setClientAppointments(list);
       setShowAppointmentModal(false);
+      setEditingAppointmentId(null);
       setAppointmentForm({
         title: '',
         date: localTodayIso(),
@@ -332,10 +409,14 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         notes: '',
       });
       setAppointmentFormError(null);
-      alert('Rendez-vous enregistré. L’athlète le verra dans son Planning.');
     } catch (e: any) {
       console.error(e);
-      setAppointmentFormError(formatSupabaseError(e, 'Erreur lors de la création du rendez-vous.'));
+      setAppointmentFormError(
+        formatSupabaseError(
+          e,
+          editingAppointmentId ? 'Erreur lors de la mise à jour du rendez-vous.' : 'Erreur lors de la création du rendez-vous.'
+        )
+      );
     } finally {
       setAppointmentSaving(false);
     }
@@ -546,17 +627,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
           {appUser?.role === 'coach' && (
             <button
               type="button"
-              onClick={() => {
-                setAppointmentFormError(null);
-                setAppointmentForm({
-                  title: '',
-                  date: localTodayIso(),
-                  time: '10:00',
-                  duration_minutes: 60,
-                  notes: '',
-                });
-                setShowAppointmentModal(true);
-              }}
+              onClick={openNewAppointmentModal}
               className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500/15 text-sky-800 dark:text-sky-200 font-bold text-sm border border-sky-500/35 hover:bg-sky-500/25 transition-colors shadow-sm"
             >
               <Calendar size={18} />
@@ -753,17 +824,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
               </h3>
               <button
                 type="button"
-                onClick={() => {
-                  setAppointmentFormError(null);
-                  setAppointmentForm({
-                    title: '',
-                    date: localTodayIso(),
-                    time: '10:00',
-                    duration_minutes: 60,
-                    notes: '',
-                  });
-                  setShowAppointmentModal(true);
-                }}
+                onClick={openNewAppointmentModal}
                 className="text-sky-700 dark:text-sky-300 text-sm font-bold flex items-center gap-1 hover:underline shrink-0"
               >
                 <Plus size={16} />
@@ -809,14 +870,24 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                           <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">{a.notes}</p>
                         ) : null}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteAppointment(a.id)}
-                        className="shrink-0 p-2 rounded-xl text-red-500 hover:bg-red-500/10"
-                        title="Supprimer"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      <div className="flex shrink-0 items-start gap-1">
+                        <button
+                          type="button"
+                          onClick={() => openEditAppointmentModal(a)}
+                          className="p-2 rounded-xl text-sky-600 dark:text-sky-400 hover:bg-sky-500/15"
+                          title="Modifier"
+                        >
+                          <Pencil size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAppointment(a.id)}
+                          className="p-2 rounded-xl text-red-500 hover:bg-red-500/10"
+                          title="Supprimer"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })
@@ -970,18 +1041,18 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
           <div
             role="presentation"
-            onClick={() => !appointmentSaving && setShowAppointmentModal(false)}
+            onClick={() => !appointmentSaving && closeAppointmentModal()}
             className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
           />
           <div className="relative w-full max-w-lg bg-background-light dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
                 <Calendar className="text-primary" size={22} />
-                Planifier un rendez-vous
+                {editingAppointmentId ? 'Modifier le rendez-vous' : 'Planifier un rendez-vous'}
               </h3>
               <button
                 type="button"
-                onClick={() => !appointmentSaving && setShowAppointmentModal(false)}
+                onClick={() => !appointmentSaving && closeAppointmentModal()}
                 className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <X size={24} />
@@ -1044,11 +1115,15 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
             <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => void handleCreateAppointment()}
+                onClick={() => void handleSaveAppointment()}
                 disabled={appointmentSaving}
                 className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
               >
-                {appointmentSaving ? 'Enregistrement…' : 'Enregistrer le rendez-vous'}
+                {appointmentSaving
+                  ? 'Enregistrement…'
+                  : editingAppointmentId
+                    ? 'Enregistrer les modifications'
+                    : 'Enregistrer le rendez-vous'}
               </button>
             </div>
           </div>

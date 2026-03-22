@@ -29,9 +29,14 @@ export class ErrorBoundary extends Component<Props, State> {
             <AlertTriangle size={32} className="text-red-500" />
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Une erreur est survenue</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 max-w-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-2 max-w-sm">
             L'application a rencontré un problème. Rechargez la page pour réessayer.
           </p>
+          {this.state.error?.message && (
+            <pre className="text-left text-xs text-red-600 dark:text-red-400 bg-red-500/10 rounded-xl p-3 mb-6 max-w-md w-full overflow-auto whitespace-pre-wrap break-words">
+              {this.state.error.message}
+            </pre>
+          )}
           <button
             onClick={() => window.location.reload()}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white font-medium hover:opacity-90"

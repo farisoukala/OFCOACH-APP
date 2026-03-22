@@ -74,18 +74,27 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
   const [form, setForm] = useState({ title: '', date: '', time: '09:00', duration: '1h', type: 'Entraînement' });
   const { appUser } = useAuth();
   const userId = appUser?.id;
+  /** Toujours dérivé de appUser (évite tout ReferenceError si une ancienne build oubliait la variable). */
+  const showAthletePlanningHint = appUser?.role === 'athlete';
 
   const loadEvents = useCallback(async () => {
     if (!userId) return;
     try {
-      const data = await fetchCalendarEvents(userId);
-      setEvents(data || []);
+      const personal = await fetchCalendarEvents(userId).catch(() => []);
+      let merged: any[] = Array.isArray(personal) ? [...personal] : [];
+      if (appUser?.role === 'athlete') {
+        const appts = await fetchAthleteAppointments(userId).catch(() => []);
+        const list = Array.isArray(appts) ? appts : [];
+        merged = [...merged, ...list.map(appointmentToCalendarRow)];
+      }
+      setEvents(merged);
     } catch (err) {
       console.error(err);
+      setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, appUser?.role]);
 
   useEffect(() => {
     if (!userId) {
@@ -183,7 +192,7 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
         <button
           onClick={openAddModal}
           className="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 transition-all"
-          title={isAthlete ? 'Ajouter un événement perso' : 'Ajouter un événement'}
+          title={showAthletePlanningHint ? 'Ajouter un événement perso' : 'Ajouter un événement'}
         >
           <Plus size={24} />
         </button>
@@ -266,7 +275,7 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
                           {[event.duration, event.type].filter(Boolean).join(' · ')}
                         </span>
                       )}
-                      {event.notes?.trim?.() && (
+                      {typeof event.notes === 'string' && event.notes.trim() !== '' && (
                         <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 whitespace-pre-wrap">{event.notes}</p>
                       )}
                     </div>
