@@ -259,8 +259,8 @@ export const Progress: React.FC = () => {
           )}
 
           {activeChartData.length >= 2 ? (
-            <div className="h-48 w-full mt-4">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-48 w-full min-h-[12rem] min-w-0 mt-4">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <AreaChart data={activeChartData}>
                   <defs>
                     <linearGradient id="colorWeight" x1="0" y1="0" x2="0" y2="1">

@@ -96,16 +96,19 @@ export async function fetchMessages() {
   return list;
 }
 
-/** Envoyer un message. */
+/** Envoyer un message. Sans .select() après insert : évite erreurs 409 / PGRST si le RETURNING est filtré par la RLS. */
 export async function sendMessage(senderId: string, receiverId: string, content: string) {
-  const { data, error } = await supabase
-    .from('messages')
-    .insert([{ id: crypto.randomUUID(), sender_id: senderId, receiver_id: receiverId, content: content.trim(), is_read: false }])
-    .select()
-    .single();
-
+  const { error } = await supabase.from('messages').insert([
+    {
+      id: crypto.randomUUID(),
+      sender_id: senderId,
+      receiver_id: receiverId,
+      content: content.trim(),
+      is_read: false,
+    },
+  ]);
   if (error) throw error;
-  return data;
+  return { ok: true as const };
 }
 
 /** Récupérer des utilisateurs par liste d'ids (pour noms/avatars des conversations). RLS doit autoriser la lecture des correspondants. */
@@ -118,8 +121,11 @@ export async function fetchUsersByIds(ids: string[]) {
 
 /** Marquer des messages comme lus (pour le destinataire). */
 export async function markMessagesAsRead(messageIds: string[]) {
-  if (messageIds.length === 0) return;
-  await supabase.from('messages').update({ is_read: true }).in('id', messageIds);
+  const ids = [...new Set(messageIds.filter(Boolean))];
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('messages').update({ is_read: true }).in('id', ids);
+  // 409 / 23505 = doublon rare ; ne pas polluer la console en boucle
+  if (error && error.code !== '23505') console.warn('markMessagesAsRead', error);
 }
 
 export async function fetchWorkoutsByAthlete(athleteId: string) {

@@ -223,7 +223,8 @@ export const Messages: React.FC<MessagesProps> = ({
       'Votre profil n\'est pas synchronisé avec la base de données.\n\n' +
       'Dans Supabase → SQL Editor (même projet que l’URL Vercel), exécutez DANS L’ORDRE :\n\n' +
       '1) supabase_migration_sync_auth_users.sql\n' +
-      '2) supabase_rpc_ensure_current_user_in_users.sql  ← indispensable pour la messagerie\n\n' +
+      '2) supabase_rpc_ensure_current_user_in_users.sql  ← indispensable pour la messagerie\n' +
+      '3) supabase_rpc_ensure_messaging_partner_in_users.sql  ← ligne du destinataire (FK)\n\n' +
       'Puis rafraîchissez la page et réessayez d’envoyer un message.'
     );
   };
@@ -238,6 +239,24 @@ export const Messages: React.FC<MessagesProps> = ({
         showSyncError();
         return;
       }
+
+      const { data: partnerOk, error: partnerRpcErr } = await supabase.rpc('ensure_messaging_partner_in_users', {
+        p_partner_id: selectedOtherId,
+      });
+      const partnerFnMissing =
+        partnerRpcErr &&
+        (/function|schema cache|not found|42883|PGRST202/i.test(String(partnerRpcErr.message || '')) ||
+          (partnerRpcErr as { code?: string }).code === '42883');
+      if (partnerRpcErr && !partnerFnMissing) {
+        console.warn('ensure_messaging_partner_in_users', partnerRpcErr);
+      }
+      if (!partnerFnMissing && partnerOk === false) {
+        alert(
+          "Le destinataire n'est pas encore dans la base ou n'est pas lié à ton compte (coach / athlète). Exécute sur Supabase les scripts sync + RPC (dont ensure_messaging_partner_in_users), ou vérifie le lien coach."
+        );
+        return;
+      }
+
       await sendMessage(myId, selectedOtherId, text);
       setInputText('');
       await loadMessages();
@@ -246,8 +265,12 @@ export const Messages: React.FC<MessagesProps> = ({
       console.error('Send message error:', err);
       const obj = err && typeof err === 'object' ? (err as { message?: string; code?: string; details?: string }) : {};
       const msg = [obj.message, obj.details].filter(Boolean).join(' ');
-      const isFkError = obj.code === '23503' || /messages_sender_id_fkey|foreign key constraint/i.test(msg);
+      const isFkError =
+        obj.code === '23503' ||
+        /messages_sender_id_fkey|messages_receiver_id_fkey|foreign key constraint/i.test(msg);
+      const isDup = obj.code === '23505' || /duplicate key|unique constraint/i.test(msg);
       if (isFkError) showSyncError();
+      else if (isDup) alert('Conflit (doublon). Réessayez dans un instant ou rafraîchissez la page.');
       else alert(msg ? `Erreur lors de l'envoi : ${msg}` : 'Erreur lors de l\'envoi');
     } finally {
       setSending(false);

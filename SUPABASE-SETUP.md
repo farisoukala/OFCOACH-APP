@@ -70,6 +70,7 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 | — | `supabase_migration_restore_coach_sees_athletes.sql` | **Dépannage** : si la liste clients est vide, rétablit la policy coach → athlètes (`coach_id`) |
 | — | **`supabase_migration_sync_auth_users.sql`** | **Messagerie** : copie `auth.users` → `public.users`, policy INSERT, trigger |
 | — | **`supabase_rpc_ensure_current_user_in_users.sql`** | **Messagerie** : fonction RPC appelée par l’app pour créer la ligne `users` même si l’INSERT client est bloqué (à exécuter après le script sync) |
+| — | **`supabase_rpc_ensure_messaging_partner_in_users.sql`** | **Messagerie** : crée la ligne `public.users` du **destinataire** si le lien coach/athlète ou une conversation existe (à exécuter après `ensure_current_user_in_users`) |
 | 4 | `supabase_migration_progress_logs.sql` | Table `progress_logs` si absente + RLS (optionnel si déjà dans le schéma) |
 | 5 | `supabase_migration_progress_logs_add_body_fat.sql` | Colonnes `body_fat` et `notes` sur `progress_logs` |
 | 6 | `supabase_migration_workout_athlete_update.sql` | RLS : athlète peut mettre à jour sa séance (ex. marquer terminée) |
@@ -103,9 +104,10 @@ ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 
 1. Exécuter **`supabase_migration_sync_auth_users.sql`** (projet Supabase = URL dans Vercel).
 2. Exécuter **`supabase_rpc_ensure_current_user_in_users.sql`** — **sans ce fichier, l’alerte « profil non synchronisé » peut revenir** malgré l’étape 1.
-3. Ré-exécuter **`supabase_migration_messages_partners.sql`** (version à jour).
-4. Vérifier **`supabase_migration_coach_and_profile.sql`** (`coach_id`).
-5. Rafraîchir l’app, réessayer d’envoyer un message.
+3. Exécuter **`supabase_rpc_ensure_messaging_partner_in_users.sql`** — permet de créer la ligne du destinataire côté serveur (évite erreurs FK / envoi bloqué).
+4. Ré-exécuter **`supabase_migration_messages_partners.sql`** (version à jour).
+5. Vérifier **`supabase_migration_coach_and_profile.sql`** (`coach_id`).
+6. Rafraîchir l’app, réessayer d’envoyer un message.
 
 Si le trigger sur `auth.users` échoue au `CREATE TRIGGER` (rare selon la version Postgres), ouvre `supabase_migration_sync_auth_users.sql` et remplace la dernière ligne `EXECUTE PROCEDURE` par `EXECUTE FUNCTION` puis relance uniquement ce bloc.
 
