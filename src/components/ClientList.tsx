@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { 
   Search, 
   Bell, 
@@ -32,11 +32,25 @@ export const ClientList: React.FC<ClientListProps> = ({
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [linkEmail, setLinkEmail] = useState('');
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
   const { appUser } = useAuth();
+
+  const normalizeText = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+  const filteredClients = useMemo(() => {
+    const q = normalizeText(searchQuery);
+    if (!q) return clients;
+    return clients.filter((client) => normalizeText(String(client?.name ?? '')).includes(q));
+  }, [clients, searchQuery]);
 
   const loadClients = useCallback(async () => {
     if (!appUser?.id) return;
@@ -110,6 +124,8 @@ export const ClientList: React.FC<ClientListProps> = ({
               <Search size={20} />
             </div>
             <input 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="block w-full pl-11 pr-4 py-3 bg-slate-100 dark:bg-slate-800/50 border-transparent focus:border-primary/30 focus:bg-white dark:focus:bg-[#1c263b] rounded-2xl transition-all text-sm outline-none placeholder:text-slate-500" 
               placeholder="Rechercher un client par nom..." 
               type="text" 
@@ -123,10 +139,10 @@ export const ClientList: React.FC<ClientListProps> = ({
           <div className="flex justify-center py-10">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
-        ) : clients.length === 0 ? (
+        ) : filteredClients.length === 0 ? (
           <div className="text-center py-10 text-slate-500">Aucun client trouvé.</div>
         ) : (
-          clients.map((client) => (
+          filteredClients.map((client) => (
             <div
               key={client.id}
               role="button"

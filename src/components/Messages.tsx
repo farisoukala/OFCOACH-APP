@@ -43,6 +43,14 @@ function formatDateLabel(dateStr: string): string {
   return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 /** Groupe les messages par jour pour afficher des séparateurs. */
 function groupMessagesByDate(threadMessages: any[]): { dateLabel: string; messages: any[] }[] {
   const groups: { dateLabel: string; messages: any[] }[] = [];
@@ -168,9 +176,9 @@ export const Messages: React.FC<MessagesProps> = ({
   }, [messages, myId, usersMap, appUser?.role, coachId]);
 
   const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
-    const q = searchQuery.trim().toLowerCase();
-    return conversations.filter((c) => c.name.toLowerCase().includes(q));
+    const q = normalizeText(searchQuery);
+    if (!q) return conversations;
+    return conversations.filter((c) => normalizeText(String(c.name ?? '')).includes(q));
   }, [conversations, searchQuery]);
 
   const threadMessages = useMemo(() => {
