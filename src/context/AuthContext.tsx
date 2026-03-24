@@ -247,12 +247,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (rpcErr && !rpcMissing) {
         console.error('ensureCurrentUserInDb rpc', rpcErr);
       }
-      if (!rpcErr && rpcOk === true) {
+      // Postgres peut renvoyer un booléen JSON strict ; on accepte aussi les cas marginaux
+      const rpcSaysOk = !rpcErr && (rpcOk === true || rpcOk === 'true');
+      if (rpcSaysOk) {
         await loadProfile(authUser);
         return true;
       }
     } catch (e) {
       console.error('ensureCurrentUserInDb rpc catch', e);
+    }
+
+    // 2) Ligne déjà présente (trigger sync_auth_users, SQL manuel, ou course avec la RPC)
+    const { data: existingRow, error: selExistErr } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', authUser.id)
+      .maybeSingle();
+    if (selExistErr) {
+      console.warn('ensureCurrentUserInDb select existing', selExistErr);
+    }
+    if (existingRow?.id) {
+      await loadProfile(authUser);
+      return true;
     }
 
     const fallback = buildAppUserFromAuth(authUser);
@@ -266,16 +282,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const role = fallback.role ?? 'athlete';
 
     try {
-      const { data: existing, error: selErr } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', authUser.id)
-        .maybeSingle();
-      if (selErr) {
-        console.error('ensureCurrentUserInDb select', selErr);
-      }
-      if (existing?.id) return true;
-
       const row = {
         id: authUser.id,
         name: displayName,

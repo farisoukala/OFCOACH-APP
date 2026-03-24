@@ -819,7 +819,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
             </p>
             {measurementSeries.length >= 2 ? (
               <div className="h-40 w-full min-h-[10rem] min-w-0">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <ResponsiveContainer width="100%" height={160} minWidth={0}>
                   <AreaChart data={measurementSeries}>
                     <defs>
                       <linearGradient id="clientMeasColor" x1="0" y1="0" x2="0" y2="1">

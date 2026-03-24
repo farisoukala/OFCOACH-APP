@@ -119,13 +119,19 @@ export async function fetchUsersByIds(ids: string[]) {
   return data || [];
 }
 
-/** Marquer des messages comme lus (pour le destinataire). */
+/** Marquer des messages comme lus (pour le destinataire). Par lots : évite URL trop longue et erreurs PostgREST. */
 export async function markMessagesAsRead(messageIds: string[]) {
   const ids = [...new Set(messageIds.filter(Boolean))];
   if (ids.length === 0) return;
-  const { error } = await supabase.from('messages').update({ is_read: true }).in('id', ids);
-  // 409 / 23505 = doublon rare ; ne pas polluer la console en boucle
-  if (error && error.code !== '23505') console.warn('markMessagesAsRead', error);
+  const CHUNK = 60;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK);
+    const { error } = await supabase.from('messages').update({ is_read: true }).in('id', chunk);
+    // Doublon / conflit rare : ignorer le bruit console
+    if (error && error.code !== '23505' && !String(error.message || '').includes('409')) {
+      console.warn('markMessagesAsRead', error);
+    }
+  }
 }
 
 export async function fetchWorkoutsByAthlete(athleteId: string) {

@@ -221,7 +221,8 @@ export const Messages: React.FC<MessagesProps> = ({
   const showSyncError = () => {
     alert(
       'Votre profil n\'est pas synchronisé avec la base de données.\n\n' +
-      'Dans Supabase → SQL Editor (même projet que l’URL Vercel), exécutez DANS L’ORDRE :\n\n' +
+      'IMPORTANT : redéployer sur Vercel ne suffit PAS — il faut aussi exécuter les scripts dans le PROJET SUPABASE (même URL que dans les variables Vercel).\n\n' +
+      'Dans Supabase → SQL Editor, exécutez DANS L’ORDRE :\n\n' +
       '1) supabase_migration_sync_auth_users.sql\n' +
       '2) supabase_rpc_ensure_current_user_in_users.sql  ← indispensable pour la messagerie\n' +
       '3) supabase_rpc_ensure_messaging_partner_in_users.sql  ← ligne du destinataire (FK)\n\n' +
@@ -263,11 +264,16 @@ export const Messages: React.FC<MessagesProps> = ({
       requestAnimationFrame(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }));
     } catch (err: unknown) {
       console.error('Send message error:', err);
+      try {
+        console.error('Send message error (JSON):', JSON.stringify(err));
+      } catch {
+        /* ignore */
+      }
       const obj = err && typeof err === 'object' ? (err as { message?: string; code?: string; details?: string }) : {};
       const msg = [obj.message, obj.details].filter(Boolean).join(' ');
       const isFkError =
         obj.code === '23503' ||
-        /messages_sender_id_fkey|messages_receiver_id_fkey|foreign key constraint/i.test(msg);
+        /messages_sender_id_fkey|messages_receiver_id_fkey|foreign key constraint|profiles/i.test(msg);
       const isDup = obj.code === '23505' || /duplicate key|unique constraint/i.test(msg);
       if (isFkError) showSyncError();
       else if (isDup) alert('Conflit (doublon). Réessayez dans un instant ou rafraîchissez la page.');

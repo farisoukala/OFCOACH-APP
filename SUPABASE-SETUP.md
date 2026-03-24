@@ -2,6 +2,18 @@
 
 > **Attention :** ce fichier est un **guide** (documentation). Ne pas le coller dans le SQL Editor de Supabase. Il faut exécuter les **fichiers .sql** listés dans la section 2 (supabase_schema.sql, supabase_rls_safe.sql, etc.).
 
+### Variables d’environnement (Vercel / build)
+
+L’erreur **`No API key found in request`** vient presque toujours d’ici : le front Vite embarque les clés **au moment du build**.
+
+1. **Vercel** → ton projet → **Settings** → **Environment Variables**.
+2. Ajoute (pour **Production** au minimum) :
+   - **`VITE_SUPABASE_URL`** = URL du projet (ex. `https://xxxx.supabase.co`) — *Supabase → Settings → API → Project URL*
+   - **`VITE_SUPABASE_ANON_KEY`** = clé **anon** / **public** (longue chaîne `eyJ...`) — *même page, anon public*
+3. **Redéploie** (nouveau déploiement sans cache si besoin) : sans ça, l’ancien build peut encore partir sans clé.
+
+En local : copie `.env.example` vers `.env` et remplis les deux variables.
+
 ---
 
 ## 1. URLs de redirection (Auth)
@@ -110,6 +122,14 @@ ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 6. Rafraîchir l’app, réessayer d’envoyer un message.
 
 Si le trigger sur `auth.users` échoue au `CREATE TRIGGER` (rare selon la version Postgres), ouvre `supabase_migration_sync_auth_users.sql` et remplace la dernière ligne `EXECUTE PROCEDURE` par `EXECUTE FUNCTION` puis relance uniquement ce bloc.
+
+### Erreur `23503` / « Key is not present in table "profiles" » (messages)
+
+Certaines bases créées avec un template Supabase ont encore **`messages`** qui référence **`profiles`** au lieu de **`public.users`**. L’app OfCoach n’utilise pas `profiles` pour la messagerie.
+
+**À exécuter une fois :** **`supabase_fix_messages_fk_profiles_to_users.sql`** (réaligne les FK `sender_id` / `receiver_id` sur `public.users`).
+
+Ensuite relancer les étapes sync + RPC ci-dessus si besoin.
 
 ---
 
