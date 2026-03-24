@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Users, 
   RefreshCw, 
@@ -32,11 +32,25 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
   onNavigateToSettings,
   onOpenClientProfile,
 }) => {
-  const [recentClients, setRecentClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const { signOut, appUser } = useAuth();
   const coachName = appUser?.name ?? 'Coach';
   const coachAvatar = appUser?.avatar || 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=150&auto=format&fit=crop';
+
+  const normalizeText = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+
+  const displayedClients = useMemo(() => {
+    const q = normalizeText(searchQuery);
+    if (!q) return clients.slice(0, 4);
+    return clients.filter((client) => normalizeText(String(client?.name ?? '')).includes(q));
+  }, [clients, searchQuery]);
 
   useEffect(() => {
     if (!appUser?.id) {
@@ -46,7 +60,7 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
     const loadRecentClients = async () => {
       try {
         const data = await fetchClients(appUser.id);
-        setRecentClients(data.slice(0, 4));
+        setClients(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error loading recent clients:', error);
       } finally {
@@ -127,6 +141,8 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={20} />
           <input 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-500 dark:placeholder:text-slate-400 text-base" 
             placeholder="Rechercher un client..." 
             type="text" 
@@ -150,10 +166,10 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
             <div className="flex justify-center py-10">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : recentClients.length === 0 ? (
-            <div className="text-center py-10 text-slate-500">Aucun client récent.</div>
+          ) : displayedClients.length === 0 ? (
+            <div className="text-center py-10 text-slate-500">Aucun client trouvé.</div>
           ) : (
-            recentClients.map((client) => (
+            displayedClients.map((client) => (
               <div 
                 key={client.id}
                 role="button"
