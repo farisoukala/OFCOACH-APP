@@ -104,7 +104,7 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
               <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Total Clients</p>
             </div>
             <div className="flex items-end justify-between mt-2">
-              <h3 className="text-3xl font-bold">40</h3>
+              <h3 className="text-3xl font-bold">{clients.length}</h3>
               <span className="text-emerald-500 text-sm font-semibold flex items-center bg-emerald-500/10 px-2 py-0.5 rounded-full">
                 <TrendingUp size={14} className="mr-1" />+5%
               </span>
