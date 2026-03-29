@@ -148,7 +148,7 @@ export const Workout: React.FC = () => {
       </section>
 
       <section>
-        <h2 className="text-lg font-bold mb-4">Séance du jour</h2>
+        <h2 className="text-lg font-bold mb-4">MA SEANCE</h2>
         {loading ? (
           <div className="bg-slate-100 dark:bg-slate-900 h-48 rounded-2xl animate-pulse flex items-center justify-center">
             <Dumbbell className="text-slate-300 animate-spin" size={32} />

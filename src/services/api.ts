@@ -146,7 +146,15 @@ export async function fetchWorkoutsByAthlete(athleteId: string) {
   return data || [];
 }
 
-export async function updateWorkout(workoutId: string, updates: { status?: string; date?: string | null }) {
+export async function updateWorkout(
+  workoutId: string,
+  updates: {
+    status?: string;
+    date?: string | null;
+    title?: string;
+    description?: string | null;
+  }
+) {
   // Cas principal côté athlète: terminer sa séance.
   // On passe par RPC pour éviter les blocages RLS UPDATE selon les environnements.
   if (updates.status === 'completed') {
@@ -170,6 +178,11 @@ export async function updateWorkout(workoutId: string, updates: { status?: strin
 
   if (error) throw error;
   return data;
+}
+
+export async function deleteWorkout(workoutId: string) {
+  const { error } = await supabase.from('workouts').delete().eq('id', workoutId);
+  if (error) throw error;
 }
 
 export async function createWorkout(workoutData: any) {

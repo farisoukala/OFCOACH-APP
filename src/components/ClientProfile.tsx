@@ -31,6 +31,10 @@ import {
   fetchBodyMeasurementSnapshots,
   fetchWorkoutsByAthlete,
   updateWorkout,
+  deleteWorkout,
+  insertExerciseForWorkout,
+  deleteExercise,
+  updateExercise as patchExerciseInDb,
   fetchAthleteAppointments,
   createAthleteAppointment,
   updateAthleteAppointment,
@@ -87,6 +91,34 @@ const formatSupabaseError = (err: any, fallback: string) => {
   }
 };
 
+const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuidString(s: string): boolean {
+  return UUID_LIKE.test(String(s));
+}
+
+function exercisePayloadFromCoachForm(ex: {
+  name?: string;
+  sets?: unknown;
+  reps?: unknown;
+  weight?: unknown;
+  rest_time?: unknown;
+}) {
+  const setsNum =
+    ex.sets === '' || ex.sets == null ? null : Math.max(0, parseInt(String(ex.sets), 10));
+  const weightNum =
+    ex.weight === '' || ex.weight == null || String(ex.weight).trim() === ''
+      ? null
+      : parseFloat(String(ex.weight).replace(',', '.'));
+  return {
+    name: String(ex.name ?? '').trim() || 'Exercice',
+    sets: setsNum === null || Number.isNaN(setsNum) ? null : setsNum,
+    reps: String(ex.reps ?? '').trim() || null,
+    weight: weightNum === null || Number.isNaN(weightNum) ? null : weightNum,
+    rest_time: String(ex.rest_time ?? '').trim() || null,
+  };
+}
+
 export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedClientId, onNavigateToMessages }) => {
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [workoutTitle, setWorkoutTitle] = useState('');
@@ -122,6 +154,8 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [nutritionForm, setNutritionForm] = useState({ title: 'Plan du jour', date: '', calories_target: 2000, protein_target: 150, carbs_target: 250, fat_target: 70 });
   const [workoutFormError, setWorkoutFormError] = useState<string | null>(null);
   const [workoutScheduledDate, setWorkoutScheduledDate] = useState(() => localTodayIso());
+  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [editingWorkoutInitialExerciseIds, setEditingWorkoutInitialExerciseIds] = useState<string[]>([]);
   const [clientWorkouts, setClientWorkouts] = useState<any[]>([]);
   const [workoutsLoading, setWorkoutsLoading] = useState(false);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
@@ -473,7 +507,68 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     }
   };
 
-  const handleCreateWorkout = async () => {
+  const closeWorkoutModal = () => {
+    setShowWorkoutModal(false);
+    setEditingWorkoutId(null);
+    setEditingWorkoutInitialExerciseIds([]);
+    setWorkoutFormError(null);
+  };
+
+  const tryCloseWorkoutModal = () => {
+    if (isSaving) return;
+    closeWorkoutModal();
+  };
+
+  const openNewWorkoutModal = () => {
+    setEditingWorkoutId(null);
+    setEditingWorkoutInitialExerciseIds([]);
+    setWorkoutTitle('');
+    setWorkoutDesc('');
+    setExercises([]);
+    setWorkoutScheduledDate(localTodayIso());
+    setWorkoutFormError(null);
+    setShowWorkoutModal(true);
+  };
+
+  const openEditWorkoutModal = (w: any) => {
+    if (!w?.id) return;
+    setEditingWorkoutId(String(w.id));
+    setWorkoutTitle(String(w.title ?? '').trim() || 'Séance');
+    setWorkoutDesc(String(w.description ?? ''));
+    const d = w.date ? String(w.date).slice(0, 10) : '';
+    setWorkoutScheduledDate(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d : localTodayIso());
+    const exList = Array.isArray(w.exercises) ? w.exercises : [];
+    setEditingWorkoutInitialExerciseIds(exList.map((e: any) => String(e.id)));
+    setExercises(
+      exList.map((ex: any) => ({
+        id: String(ex.id),
+        name: String(ex.name ?? ''),
+        sets: ex.sets ?? '',
+        reps: String(ex.reps ?? ''),
+        weight: ex.weight ?? '',
+        rest_time: String(ex.rest_time ?? ''),
+      }))
+    );
+    setWorkoutFormError(null);
+    setShowWorkoutModal(true);
+  };
+
+  const handleDeleteWorkout = async (workoutId: string) => {
+    if (!confirm('Supprimer cette séance et tous ses exercices ?')) return;
+    try {
+      await deleteWorkout(workoutId);
+      if (selectedClientId) {
+        const list = await fetchWorkoutsByAthlete(selectedClientId);
+        setClientWorkouts(sortWorkoutsBySchedule(list));
+      }
+      if (editingWorkoutId === workoutId) closeWorkoutModal();
+    } catch (e) {
+      console.error(e);
+      alert(formatSupabaseError(e as any, 'Impossible de supprimer la séance.'));
+    }
+  };
+
+  const handleSaveWorkout = async () => {
     setWorkoutFormError(null);
     if (!workoutTitle.trim()) {
       setWorkoutFormError('Veuillez donner un titre à la séance.');
@@ -483,34 +578,69 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     if (!selectedClientId) return;
     setIsSaving(true);
     try {
-      await createWorkout({
-        id: crypto.randomUUID(),
-        athlete_id: selectedClientId,
-        coach_id: appUser.id,
-        title: workoutTitle,
-        description: workoutDesc,
-        date: workoutScheduledDate || localTodayIso(),
-        exercises
-      });
-      try {
-        await createNotification(selectedClientId, {
-          type: 'workout',
-          title: 'Nouvelle séance',
-          body: workoutTitle,
+      if (editingWorkoutId) {
+        await updateWorkout(editingWorkoutId, {
+          title: workoutTitle.trim(),
+          description: workoutDesc.trim() || null,
+          date: workoutScheduledDate || localTodayIso(),
         });
-      } catch (_) { /* notification optionnelle */ }
-      const list = await fetchWorkoutsByAthlete(selectedClientId);
-      setClientWorkouts(sortWorkoutsBySchedule(list));
-      setShowWorkoutModal(false);
-      setWorkoutTitle('');
-      setWorkoutDesc('');
-      setExercises([]);
-      setWorkoutScheduledDate(localTodayIso());
-      setWorkoutFormError(null);
-      alert('Séance créée avec succès !');
+        const formUuidIds = exercises.filter((e) => isUuidString(String(e.id))).map((e) => String(e.id));
+        for (const oldId of editingWorkoutInitialExerciseIds) {
+          if (!formUuidIds.includes(oldId)) {
+            await deleteExercise(oldId);
+          }
+        }
+        for (const ex of exercises) {
+          const payload = exercisePayloadFromCoachForm(ex);
+          const sid = String(ex.id);
+          if (isUuidString(sid)) {
+            await patchExerciseInDb(sid, payload);
+          } else {
+            await insertExerciseForWorkout(editingWorkoutId, payload);
+          }
+        }
+        const list = await fetchWorkoutsByAthlete(selectedClientId);
+        setClientWorkouts(sortWorkoutsBySchedule(list));
+        closeWorkoutModal();
+        setWorkoutTitle('');
+        setWorkoutDesc('');
+        setExercises([]);
+        setWorkoutScheduledDate(localTodayIso());
+        alert('Séance mise à jour.');
+      } else {
+        await createWorkout({
+          id: crypto.randomUUID(),
+          athlete_id: selectedClientId,
+          coach_id: appUser.id,
+          title: workoutTitle,
+          description: workoutDesc,
+          date: workoutScheduledDate || localTodayIso(),
+          exercises,
+        });
+        try {
+          await createNotification(selectedClientId, {
+            type: 'workout',
+            title: 'Nouvelle séance',
+            body: workoutTitle,
+          });
+        } catch (_) {
+          /* notification optionnelle */
+        }
+        const list = await fetchWorkoutsByAthlete(selectedClientId);
+        setClientWorkouts(sortWorkoutsBySchedule(list));
+        closeWorkoutModal();
+        setWorkoutTitle('');
+        setWorkoutDesc('');
+        setExercises([]);
+        setWorkoutScheduledDate(localTodayIso());
+        alert('Séance créée avec succès !');
+      }
     } catch (error: any) {
-      console.error('Error creating workout:', error);
-      const msg = formatSupabaseError(error, 'Erreur lors de la création de la séance.');
+      console.error('Error saving workout:', error);
+      const msg = formatSupabaseError(
+        error,
+        editingWorkoutId ? 'Erreur lors de la mise à jour de la séance.' : 'Erreur lors de la création de la séance.'
+      );
       setWorkoutFormError(msg);
     } finally {
       setIsSaving(false);
@@ -963,12 +1093,9 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
               <Dumbbell className="text-primary" size={20} />
               Programmation
             </h3>
-            <button 
-              onClick={() => {
-                setWorkoutFormError(null);
-                setWorkoutScheduledDate(localTodayIso());
-                setShowWorkoutModal(true);
-              }}
+            <button
+              type="button"
+              onClick={openNewWorkoutModal}
               className="text-primary text-sm font-bold flex items-center gap-1 hover:underline"
             >
               <Plus size={16} />
@@ -992,7 +1119,11 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                   className="bg-slate-100 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 space-y-3"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
+                    <button
+                      type="button"
+                      onClick={() => openEditWorkoutModal(w)}
+                      className="min-w-0 flex-1 text-left rounded-xl -m-1 p-1 hover:bg-slate-200/80 dark:hover:bg-slate-700/50 transition-colors"
+                    >
                       <h4 className="font-bold truncate">{w.title}</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         {w.date
@@ -1004,16 +1135,35 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                           : 'Date non définie'}
                         {w.status === 'completed' ? ' · Terminée' : ''}
                       </p>
+                      <p className="text-[10px] font-semibold text-primary mt-1">Modifier la séance</p>
+                    </button>
+                    <div className="flex shrink-0 items-start gap-1">
+                      <span
+                        className={`text-[10px] font-bold uppercase px-2 py-1 rounded-lg ${
+                          w.status === 'completed'
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-primary/15 text-primary'
+                        }`}
+                      >
+                        {w.status === 'completed' ? 'Fait' : 'À faire'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => openEditWorkoutModal(w)}
+                        className="p-2 rounded-xl text-primary hover:bg-primary/15"
+                        title="Modifier"
+                      >
+                        <Pencil size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteWorkout(w.id)}
+                        className="p-2 rounded-xl text-red-500 hover:bg-red-500/10"
+                        title="Supprimer"
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </div>
-                    <span
-                      className={`shrink-0 text-[10px] font-bold uppercase px-2 py-1 rounded-lg ${
-                        w.status === 'completed'
-                          ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                          : 'bg-primary/15 text-primary'
-                      }`}
-                    >
-                      {w.status === 'completed' ? 'Fait' : 'À faire'}
-                    </span>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <label className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">Reporter au</label>
@@ -1256,11 +1406,17 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       {/* Workout Creation Modal */}
       {showWorkoutModal && (
           <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
-            <div role="presentation" onClick={() => setShowWorkoutModal(false)} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
+            <div role="presentation" onClick={tryCloseWorkoutModal} className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" />
             <div className="relative w-full max-w-lg bg-background-light dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                <h3 className="text-xl font-bold tracking-tight">Créer une séance</h3>
-                <button onClick={() => setShowWorkoutModal(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                <h3 className="text-xl font-bold tracking-tight">
+                  {editingWorkoutId ? 'Modifier la séance' : 'Créer une séance'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={tryCloseWorkoutModal}
+                  className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                >
                   <X size={24} />
                 </button>
               </div>
@@ -1321,7 +1477,8 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Exercices</label>
-                    <button 
+                    <button
+                      type="button"
                       onClick={addExercise}
                       className="text-primary text-xs font-bold flex items-center gap-1"
                     >
@@ -1339,7 +1496,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
                             placeholder="Nom de l'exercice"
                             className="flex-1 bg-transparent border-none p-0 font-bold outline-none placeholder:text-slate-400"
                           />
-                          <button onClick={() => removeExercise(ex.id)} className="text-red-500 p-1">
+                          <button type="button" onClick={() => removeExercise(ex.id)} className="text-red-500 p-1">
                             <Trash2 size={18} />
                           </button>
                         </div>
@@ -1386,12 +1543,19 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
               </div>
 
               <div className="p-6 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800">
-                <button 
-                  onClick={handleCreateWorkout}
+                <button
+                  type="button"
+                  onClick={() => void handleSaveWorkout()}
                   disabled={isSaving}
                   className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-95"
                 >
-                  {isSaving ? 'Création...' : 'Assigner la séance'}
+                  {isSaving
+                    ? editingWorkoutId
+                      ? 'Enregistrement…'
+                      : 'Création…'
+                    : editingWorkoutId
+                      ? 'Enregistrer les modifications'
+                      : 'Assigner la séance'}
                 </button>
               </div>
             </div>
