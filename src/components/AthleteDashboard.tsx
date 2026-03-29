@@ -25,11 +25,12 @@ import {
   countUnreadMessagesForUser,
 } from '../services/api';
 import { pickFeaturedWorkout, localTodayIso } from '../lib/workoutPlanning';
+import { useAthleteReminders } from '../hooks/useAthleteReminders';
 
 const Progress = lazy(() => import('./Progress').then((m) => ({ default: m.Progress })));
 const Nutrition = lazy(() => import('./Nutrition').then((m) => ({ default: m.Nutrition })));
 const Workout = lazy(() => import('./Workout').then((m) => ({ default: m.Workout })));
-const Profile = lazy(() => import('./Profile').then((m) => ({ default: m.Profile })));
+import { Profile } from './Profile';
 import { useAuth } from '../context/AuthContext';
 
 type Tab = 'accueil' | 'workout' | 'nutrition' | 'progress' | 'profile';
@@ -282,6 +283,22 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
     .filter((a) => a?.starts_at && !Number.isNaN(new Date(a.starts_at).getTime()))
     .filter((a) => new Date(a.starts_at) >= startOfToday)
     .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime())[0];
+
+  const todayWorkoutTitle = useMemo(() => {
+    const w = logbookWorkout;
+    if (!w?.title) return null;
+    const d = w.date ? String(w.date) : '';
+    if (d !== todayIso) return null;
+    if (w.status === 'completed') return null;
+    return String(w.title);
+  }, [logbookWorkout, todayIso]);
+
+  useAthleteReminders({
+    enabled: appUser?.role === 'athlete' && Boolean(athleteId),
+    nextAppt: nextCoachAppt ?? null,
+    todayWorkoutTitle,
+    unreadMessages,
+  });
 
   const renderContent = () => {
     switch (activeTab) {
@@ -582,11 +599,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
           </Suspense>
         );
       case 'profile':
-        return (
-          <Suspense fallback={<div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>}>
-            <Profile />
-          </Suspense>
-        );
+        return <Profile />;
       default:
         return <div className="text-center py-20 opacity-50">En cours de développement...</div>;
     }
@@ -619,17 +632,23 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
                 type="button"
                 onClick={() => onNavigateToCalendar()}
                 className="p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/20 transition-colors"
+                aria-label="Ouvrir le planning des rendez-vous"
                 title="Planning"
               >
-                <Calendar size={20} />
+                <Calendar size={20} aria-hidden />
               </button>
             )}
             <button
               type="button"
               onClick={() => onNavigateToNotifications?.()}
               className="relative p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/20 transition-colors"
+              aria-label={
+                unreadNotifications > 0
+                  ? `Notifications, ${unreadNotifications} non lue${unreadNotifications > 1 ? 's' : ''}`
+                  : 'Notifications'
+              }
             >
-              <Bell size={20} />
+              <Bell size={20} aria-hidden />
               {unreadNotifications > 0 && (
                 <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-primary text-white text-[10px] font-bold rounded-full ring-2 ring-background-light dark:ring-background-dark">
                   {unreadNotifications > 99 ? '99+' : unreadNotifications}
@@ -637,25 +656,29 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
               )}
             </button>
             <button
+              type="button"
               onClick={() => signOut()}
               className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 text-slate-100 hover:bg-slate-800 transition-colors"
             >
-              <LogOut size={14} />
+              <LogOut size={14} aria-hidden />
               <span>Déconnexion</span>
             </button>
           </div>
         </div>
 
         {/* Sub-tabs for athlete view */}
-        <div className="flex px-4">
+        <div className="flex px-4" role="tablist" aria-label="Sections principales">
           {[
-            { id: 'accueil', label: 'Accueil', icon: <Home size={16} /> },
-            { id: 'progress', label: 'Progrès', icon: <TrendingUp size={16} /> },
-            { id: 'nutrition', label: 'Nutrition', icon: <Apple size={16} /> },
-            { id: 'workout', label: 'Entraînement', icon: <Dumbbell size={16} /> }
+            { id: 'accueil', label: 'Accueil', icon: <Home size={16} aria-hidden /> },
+            { id: 'progress', label: 'Progrès', icon: <TrendingUp size={16} aria-hidden /> },
+            { id: 'nutrition', label: 'Nutrition', icon: <Apple size={16} aria-hidden /> },
+            { id: 'workout', label: 'Entraînement', icon: <Dumbbell size={16} aria-hidden /> },
           ].map((tab) => (
-            <button 
+            <button
               key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id as Tab)}
               className={`flex-1 py-3 text-xs font-bold border-b-2 transition-all flex items-center justify-center gap-1.5 ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-slate-500 dark:text-slate-400'}`}
             >
@@ -672,54 +695,75 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
         </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-background-light dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pt-3 pb-8 z-50 px-2">
+      <nav
+        className="fixed bottom-0 left-0 right-0 bg-background-light dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 pt-3 pb-8 z-50 px-2"
+        aria-label="Navigation principale"
+      >
         <div className="flex justify-between items-center max-w-md mx-auto">
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveTab('accueil')}
             className={`flex flex-col items-center gap-1 ${activeTab === 'accueil' ? 'text-primary' : 'text-slate-400'}`}
+            aria-current={activeTab === 'accueil' ? 'page' : undefined}
           >
-            <Home size={24} />
+            <Home size={24} aria-hidden />
             <span className="text-[10px] font-bold">Accueil</span>
           </button>
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveTab('workout')}
             className={`flex flex-col items-center gap-1 ${activeTab === 'workout' ? 'text-primary' : 'text-slate-400'}`}
+            aria-current={activeTab === 'workout' ? 'page' : undefined}
           >
-            <Dumbbell size={24} />
+            <Dumbbell size={24} aria-hidden />
             <span className="text-[10px] font-medium">Entraînement</span>
           </button>
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveTab('nutrition')}
             className={`flex flex-col items-center gap-1 ${activeTab === 'nutrition' ? 'text-primary' : 'text-slate-400'}`}
+            aria-current={activeTab === 'nutrition' ? 'page' : undefined}
           >
-            <Apple size={24} />
+            <Apple size={24} aria-hidden />
             <span className="text-[10px] font-medium">Nutrition</span>
           </button>
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveTab('progress')}
             className={`flex flex-col items-center gap-1 ${activeTab === 'progress' ? 'text-primary' : 'text-slate-400'}`}
+            aria-current={activeTab === 'progress' ? 'page' : undefined}
           >
-            <TrendingUp size={24} />
+            <TrendingUp size={24} aria-hidden />
             <span className="text-[10px] font-medium">Progrès</span>
           </button>
           <button
             type="button"
             onClick={() => onNavigateToMessages()}
             className="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors relative"
+            aria-label={
+              unreadMessages > 0
+                ? `Messagerie, ${unreadMessages} message${unreadMessages > 1 ? 's' : ''} non lu${unreadMessages > 1 ? 's' : ''}`
+                : 'Messagerie'
+            }
           >
-            <MessageCircle size={24} />
+            <MessageCircle size={24} aria-hidden />
             <span className="text-[10px] font-medium">Messagerie</span>
             {unreadMessages > 0 && (
-              <span className="absolute top-0 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full ring-2 ring-background-light dark:ring-background-dark">
+              <span
+                className="absolute top-0 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full ring-2 ring-background-light dark:ring-background-dark"
+                aria-hidden
+              >
                 {unreadMessages > 99 ? '99+' : unreadMessages}
               </span>
             )}
           </button>
-          <button 
+          <button
+            type="button"
             onClick={() => setActiveTab('profile')}
             className={`flex flex-col items-center gap-1 ${activeTab === 'profile' ? 'text-primary' : 'text-slate-400'}`}
+            aria-current={activeTab === 'profile' ? 'page' : undefined}
           >
-            <User size={24} />
+            <User size={24} aria-hidden />
             <span className="text-[10px] font-medium">Profil</span>
           </button>
         </div>

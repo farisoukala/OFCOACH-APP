@@ -15,6 +15,7 @@ import {
   fetchAthleteAppointments,
 } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { toast } from '../lib/toast';
 
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -158,7 +159,7 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
       setShowAddModal(false);
     } catch (err) {
       console.error(err);
-      alert('Erreur lors de la création de l\'événement');
+      toast.error('Événement non créé', 'Vérifie ta connexion ou les droits sur Supabase.');
     } finally {
       setSaving(false);
     }

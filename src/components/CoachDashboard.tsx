@@ -77,10 +77,11 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
           </div>
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => signOut()}
               className="hidden sm:inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 text-slate-100 hover:bg-slate-800 transition-colors"
             >
-              <LogOut size={14} />
+              <LogOut size={14} aria-hidden />
               <span>Déconnexion</span>
             </button>
             <div className="size-12 rounded-full border-2 border-primary/30 p-0.5 overflow-hidden">
@@ -111,12 +112,13 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
 
         <div className="relative group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={20} />
-          <input 
+          <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-500 dark:placeholder:text-slate-400 text-base" 
-            placeholder="Rechercher un client..." 
-            type="text" 
+            className="w-full bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-xl py-4 pl-12 pr-4 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all placeholder:text-slate-500 dark:placeholder:text-slate-400 text-base"
+            placeholder="Rechercher un client..."
+            type="search"
+            aria-label="Rechercher un client"
           />
         </div>
       </header>
@@ -194,37 +196,44 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
         </div>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-6 py-3 pb-8 flex items-center justify-between z-50">
-        <button className="flex flex-col items-center gap-1 group">
-          <Grid className="text-primary transition-all scale-110" fill="currentColor" size={24} />
+      <nav
+        className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-6 py-3 pb-8 flex items-center justify-between z-50"
+        aria-label="Navigation coach"
+      >
+        <button type="button" className="flex flex-col items-center gap-1 group" aria-current="page">
+          <Grid className="text-primary transition-all scale-110" fill="currentColor" size={24} aria-hidden />
           <span className="text-[10px] font-bold text-primary">Tableau</span>
         </button>
-        <button 
+        <button
+          type="button"
           onClick={onNavigateToClients}
           className="flex flex-col items-center gap-1 group text-slate-400 hover:text-primary transition-colors"
         >
-          <Users size={24} />
+          <Users size={24} aria-hidden />
           <span className="text-[10px] font-medium">Clients</span>
         </button>
-        <button 
+        <button
+          type="button"
           onClick={onNavigateToMessages}
           className="flex flex-col items-center gap-1 group text-slate-400 hover:text-primary transition-colors"
         >
-          <MessageSquare size={24} />
+          <MessageSquare size={24} aria-hidden />
           <span className="text-[10px] font-medium">Messages</span>
         </button>
-        <button 
+        <button
+          type="button"
           onClick={onNavigateToCalendar}
           className="flex flex-col items-center gap-1 group text-slate-400 hover:text-primary transition-colors"
         >
-          <Calendar size={24} />
+          <Calendar size={24} aria-hidden />
           <span className="text-[10px] font-medium">Planning</span>
         </button>
         <button
+          type="button"
           onClick={onNavigateToSettings}
           className="flex flex-col items-center gap-1 group text-slate-400 hover:text-primary transition-colors"
         >
-          <Settings size={24} />
+          <Settings size={24} aria-hidden />
           <span className="text-[10px] font-medium">Réglages</span>
         </button>
       </nav>

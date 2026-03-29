@@ -19,6 +19,7 @@ import {
 } from 'recharts';
 import { fetchBodyMeasurementSnapshots, fetchProgressLogs, createProgressLog, updateProgressLog, deleteProgressLog } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { toast } from '../lib/toast';
 
 export const Progress: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
@@ -70,7 +71,10 @@ export const Progress: React.FC = () => {
     // depuis "Réglages -> Profil" quand tu cliques "Enregistrer les mensurations".
     // L’écran Progrès mensurations n’a pas encore de modal d’ajout dédiée.
     if (mode === 'mensurations') {
-      alert("Pour créer un relevé en cm : Réglages -> Profil -> Mensurations -> « Enregistrer les mensurations ».");
+      toast.info(
+        'Relevé en cm',
+        'Va dans Réglages → Profil → Mensurations, puis « Enregistrer les mensurations ».'
+      );
       return;
     }
     setEditingId(null);
@@ -98,7 +102,7 @@ export const Progress: React.FC = () => {
     if (!athleteId) return;
     const weight = form.weight ? parseFloat(form.weight) : null;
     if (weight == null || !form.date) {
-      alert('Renseignez au moins la date et le poids.');
+      toast.warning('Champs requis', 'Indique au moins la date et le poids.');
       return;
     }
     setSaving(true);
@@ -123,7 +127,7 @@ export const Progress: React.FC = () => {
     } catch (err: any) {
       console.error(err);
       const msg = err?.message || err?.error_description || 'Erreur lors de l\'enregistrement.';
-      alert(msg);
+      toast.error('Enregistrement impossible', msg);
     } finally {
       setSaving(false);
     }

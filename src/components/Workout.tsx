@@ -17,6 +17,7 @@ import {
   localDateIso,
   localTodayIso,
 } from '../lib/workoutPlanning';
+import { toast } from '../lib/toast';
 
 function formatWorkoutDate(dateStr: string | null): string {
   if (!dateStr) return '—';
@@ -84,7 +85,7 @@ export const Workout: React.FC = () => {
       const msg =
         (err?.code ? `[${err.code}] ` : '') +
         (err?.message || err?.error_description || err?.hint || 'Erreur lors de la mise à jour.');
-      alert(msg);
+      toast.error('Séance non mise à jour', msg);
     } finally {
       setMarkingId(null);
     }

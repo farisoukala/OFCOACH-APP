@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { fetchMessages, sendMessage, fetchUsersByIds, markMessagesAsRead, fetchClients } from '../services/api';
+import { toast } from '../lib/toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -297,14 +298,10 @@ export const Messages: React.FC<MessagesProps> = ({
   };
 
   const showSyncError = () => {
-    alert(
-      'Votre profil n\'est pas synchronisé avec la base de données.\n\n' +
-      'IMPORTANT : redéployer sur Vercel ne suffit PAS — il faut aussi exécuter les scripts dans le PROJET SUPABASE (même URL que dans les variables Vercel).\n\n' +
-      'Dans Supabase → SQL Editor, exécutez DANS L’ORDRE :\n\n' +
-      '1) supabase_migration_sync_auth_users.sql\n' +
-      '2) supabase_rpc_ensure_current_user_in_users.sql  ← indispensable pour la messagerie\n' +
-      '3) supabase_rpc_ensure_messaging_partner_in_users.sql  ← ligne du destinataire (FK)\n\n' +
-      'Puis rafraîchissez la page et réessayez d’envoyer un message.'
+    toast.error(
+      'Profil non synchronisé avec la base',
+      'Sur Supabase → SQL Editor, exécute dans l’ordre : supabase_migration_sync_auth_users.sql, supabase_rpc_ensure_current_user_in_users.sql, supabase_rpc_ensure_messaging_partner_in_users.sql. Un simple redéploiement Vercel ne suffit pas. Puis rafraîchis la page.',
+      22_000
     );
   };
 
@@ -330,8 +327,9 @@ export const Messages: React.FC<MessagesProps> = ({
         console.warn('ensure_messaging_partner_in_users', partnerRpcErr);
       }
       if (!partnerFnMissing && partnerOk === false) {
-        alert(
-          "Le destinataire n'est pas encore dans la base ou n'est pas lié à ton compte (coach / athlète). Exécute sur Supabase les scripts sync + RPC (dont ensure_messaging_partner_in_users), ou vérifie le lien coach."
+        toast.warning(
+          'Destinataire introuvable ou non lié',
+          'Exécute sur Supabase les scripts sync + RPC (dont ensure_messaging_partner_in_users), ou vérifie le lien coach / athlète.'
         );
         return;
       }
@@ -354,8 +352,8 @@ export const Messages: React.FC<MessagesProps> = ({
         /messages_sender_id_fkey|messages_receiver_id_fkey|foreign key constraint|profiles/i.test(msg);
       const isDup = obj.code === '23505' || /duplicate key|unique constraint/i.test(msg);
       if (isFkError) showSyncError();
-      else if (isDup) alert('Conflit (doublon). Réessayez dans un instant ou rafraîchissez la page.');
-      else alert(msg ? `Erreur lors de l'envoi : ${msg}` : 'Erreur lors de l\'envoi');
+      else if (isDup) toast.warning('Conflit (doublon)', 'Réessaie dans un instant ou rafraîchis la page.');
+      else toast.error("Erreur d'envoi", msg || 'Impossible d’envoyer le message.');
     } finally {
       setSending(false);
     }
@@ -379,8 +377,13 @@ export const Messages: React.FC<MessagesProps> = ({
   return (
     <div className="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen flex flex-col">
       <header className="sticky top-0 z-10 bg-background-light/95 dark:bg-background-dark/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center gap-3">
-        <button type="button" onClick={() => (selectedOtherId ? setSelectedOtherId(null) : onBack?.())} className="p-2 -ml-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
-          <ArrowLeft size={24} />
+        <button
+          type="button"
+          onClick={() => (selectedOtherId ? setSelectedOtherId(null) : onBack?.())}
+          className="p-2 -ml-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+          aria-label={selectedOtherId ? 'Retour à la liste des conversations' : 'Quitter les messages'}
+        >
+          <ArrowLeft size={24} aria-hidden />
         </button>
         {selectedOtherId ? (
           <>

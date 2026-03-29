@@ -41,6 +41,7 @@ import {
   deleteAthleteAppointment,
 } from '../services/api';
 import { localTodayIso, nextOccurrenceJsWeekday, sortWorkoutsBySchedule, weekdayLabelFrFromIso } from '../lib/workoutPlanning';
+import { toast } from '../lib/toast';
 import { useAuth } from '../context/AuthContext';
 import { upsertBodyMeasurementSnapshot } from '../services/api';
 import { AreaChart, Area, ResponsiveContainer, CartesianGrid, XAxis, YAxis, Tooltip } from 'recharts';
@@ -297,7 +298,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       setEditProfile(false);
     } catch (e) {
       console.error(e);
-      alert('Erreur lors de l’enregistrement du profil');
+      toast.error('Erreur lors de l’enregistrement du profil');
     } finally {
       setSavingProfile(false);
     }
@@ -316,7 +317,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       setProfileForm((f) => ({ ...f, objectives: fresh.objectives ?? '' }));
     } catch (e) {
       console.error(e);
-      alert('Impossible d’enregistrer l’objectif. Réessaie ou vérifie les droits RLS.');
+      toast.error('Impossible d’enregistrer l’objectif', 'Réessaie ou vérifie les droits RLS sur Supabase.');
     } finally {
       setSavingAthleteObjective(false);
     }
@@ -430,7 +431,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         } catch {
           /* optionnel */
         }
-        alert('Rendez-vous mis à jour. L’athlète verra le changement dans son planning.');
+        toast.success('Rendez-vous mis à jour', 'L’athlète verra le changement dans son planning.');
       } else {
         await createAthleteAppointment(selectedClientId, appUser.id, {
           title: appointmentForm.title.trim(),
@@ -450,7 +451,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         } catch {
           /* optionnel */
         }
-        alert('Rendez-vous enregistré. L’athlète le verra dans son Planning.');
+        toast.success('Rendez-vous enregistré', 'L’athlète le verra dans son planning.');
       }
       const list = await fetchAthleteAppointments(selectedClientId);
       setClientAppointments(list);
@@ -486,7 +487,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       }
     } catch (e) {
       console.error(e);
-      alert('Impossible de supprimer le rendez-vous.');
+      toast.error('Impossible de supprimer le rendez-vous.');
     }
   };
 
@@ -501,7 +502,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       }
     } catch (e) {
       console.error(e);
-      alert('Impossible de modifier la date de la séance (droits ou réseau).');
+      toast.error('Impossible de modifier la date de la séance', 'Vérifie les droits RLS ou ta connexion.');
     } finally {
       setReschedulingId(null);
     }
@@ -564,7 +565,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       if (editingWorkoutId === workoutId) closeWorkoutModal();
     } catch (e) {
       console.error(e);
-      alert(formatSupabaseError(e as any, 'Impossible de supprimer la séance.'));
+      toast.error('Suppression impossible', formatSupabaseError(e as any, 'Impossible de supprimer la séance.'));
     }
   };
 
@@ -606,7 +607,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         setWorkoutDesc('');
         setExercises([]);
         setWorkoutScheduledDate(localTodayIso());
-        alert('Séance mise à jour.');
+        toast.success('Séance mise à jour.');
       } else {
         await createWorkout({
           id: crypto.randomUUID(),
@@ -633,7 +634,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         setWorkoutDesc('');
         setExercises([]);
         setWorkoutScheduledDate(localTodayIso());
-        alert('Séance créée avec succès !');
+        toast.success('Séance créée avec succès');
       }
     } catch (error: any) {
       console.error('Error saving workout:', error);
@@ -690,10 +691,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     try {
       await deleteNutritionPlan(nutritionPlan.id);
       setNutritionPlan(await fetchNutritionPlan(selectedClientId));
-      alert('Plan supprimé.');
+      toast.success('Plan supprimé.');
     } catch (e: any) {
       console.error(e);
-      alert(formatSupabaseError(e, 'Impossible de supprimer le plan.'));
+      toast.error('Suppression impossible', formatSupabaseError(e, 'Impossible de supprimer le plan.'));
     }
   };
 
@@ -740,7 +741,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       setShowNutritionModal(false);
       setEditingNutritionPlanId(null);
       setNutritionFormError(null);
-      alert(isEditMode ? 'Plan nutritionnel mis à jour.' : 'Plan nutritionnel créé.');
+      toast.success(isEditMode ? 'Plan nutritionnel mis à jour' : 'Plan nutritionnel créé');
     } catch (e: any) {
       console.error(e);
       const msg = formatSupabaseError(

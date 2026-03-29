@@ -15,6 +15,11 @@ import { useAuth } from '../context/AuthContext';
 import { fetchClientById, updateUserProfile, upsertBodyMeasurementSnapshot } from '../services/api';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import { validatePassword, validatePasswordMatch, validateRequired } from '../utils/validation';
+import { toast } from '../lib/toast';
+import {
+  getBrowserNotificationSupport,
+  requestBrowserNotificationPermission,
+} from '../lib/browserNotifications';
 
 const defaultAvatar = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=200&auto=format&fit=crop';
 
@@ -38,6 +43,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordFieldErrors, setPasswordFieldErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
+  const [browserNotifyPerm, setBrowserNotifyPerm] = useState(() => getBrowserNotificationSupport());
 
   const [tailleCm, setTailleCm] = useState<string>('');
   const [tourPoitrineCm, setTourPoitrineCm] = useState<string>('');
@@ -84,7 +90,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
       await refreshProfile();
     } catch (e) {
       console.error(e);
-      alert('Erreur lors de l\'enregistrement.');
+      toast.error('Erreur lors de l’enregistrement.');
     } finally {
       setSaving(false);
     }
@@ -120,7 +126,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
       await refreshProfile();
     } catch (e) {
       console.error(e);
-      alert('Erreur lors de la sauvegarde des mensurations.');
+      toast.error('Erreur lors de la sauvegarde des mensurations.');
     } finally {
       setSaving(false);
     }
@@ -163,7 +169,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
       setShowPasswordModal(false);
       setPasswordError(null);
       setPasswordFieldErrors({});
-      alert('Mot de passe modifié.');
+      toast.success('Mot de passe modifié.');
     } finally {
       setSavingPassword(false);
     }
@@ -383,6 +389,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
           <ChevronRight size={18} className="text-slate-400" />
         </div>
         <button
+          type="button"
           onClick={onNavigateToNotifications}
           className="w-full flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
         >
@@ -392,6 +399,36 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
           </div>
           <ChevronRight size={18} className="text-slate-400" />
         </button>
+
+        {appUser?.role === 'athlete' && browserNotifyPerm !== 'unsupported' && (
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/40 p-4 space-y-2">
+            <p className="text-sm font-bold text-slate-900 dark:text-white">Rappels navigateur</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              En complément des toasts dans l’app, tu peux autoriser les notifications du navigateur pour les rappels RDV
+              (sous 48 h), séance du jour et nouveaux messages (hors onglet actif). Fonctionne en HTTPS ou en local.
+            </p>
+            {browserNotifyPerm === 'granted' ? (
+              <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Notifications autorisées</p>
+            ) : browserNotifyPerm === 'denied' ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Refus navigateur : débloque les notifications pour ce site dans les paramètres du navigateur.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  const r = await requestBrowserNotificationPermission();
+                  setBrowserNotifyPerm(r);
+                  if (r === 'granted') toast.success('Rappels navigateur activés');
+                  else if (r === 'denied') toast.warning('Notifications refusées', 'Tu peux réessayer via les paramètres du site.');
+                }}
+                className="w-full py-2.5 rounded-xl bg-primary text-white text-sm font-bold"
+              >
+                Autoriser les notifications du navigateur
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="px-4 space-y-2">
