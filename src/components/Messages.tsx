@@ -12,7 +12,7 @@ import {
   Send,
   ChevronRight,
 } from 'lucide-react';
-import { fetchMessages, sendMessage, fetchUsersByIds, markMessagesAsRead } from '../services/api';
+import { fetchMessages, sendMessage, fetchUsersByIds, markMessagesAsRead, fetchClients } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -99,6 +99,7 @@ export const Messages: React.FC<MessagesProps> = ({
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [coachClients, setCoachClients] = useState<any[]>([]);
   const [athleteCoachId, setAthleteCoachId] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const hasRefreshedProfileForCoach = useRef(false);
@@ -112,6 +113,43 @@ export const Messages: React.FC<MessagesProps> = ({
       .then(({ data }) => setAthleteCoachId(data?.coach_id ?? null))
       .catch(() => setAthleteCoachId(null));
   }, [appUser?.role, myId]);
+
+  /** Tous les athlètes liés au coach : pour afficher / rechercher même sans historique de messages. */
+  useEffect(() => {
+    if (appUser?.role !== 'coach' || !myId) {
+      setCoachClients([]);
+      return;
+    }
+    let cancelled = false;
+    fetchClients(myId)
+      .then((data) => {
+        if (!cancelled) setCoachClients(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setCoachClients([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [appUser?.role, myId]);
+
+  useEffect(() => {
+    if (!coachClients.length) return;
+    setUsersMap((prev) => {
+      const next = { ...prev };
+      coachClients.forEach((c: any) => {
+        if (c?.id) {
+          next[String(c.id)] = {
+            id: String(c.id),
+            name: c.name ?? null,
+            avatar: c.avatar ?? null,
+            role: c.role,
+          };
+        }
+      });
+      return next;
+    });
+  }, [coachClients]);
 
   useEffect(() => {
     if (openWithUserId && myId && openWithUserId !== myId) {
@@ -140,10 +178,14 @@ export const Messages: React.FC<MessagesProps> = ({
       const ids = Array.from(otherIds);
       if (ids.length > 0) {
         const users = await fetchUsersByIds(ids).catch(() => []);
-        const map: Record<string, any> = {};
-        (Array.isArray(users) ? users : []).forEach((u: any) => { if (u?.id) map[u.id] = u; });
-        setUsersMap(map);
-      } else setUsersMap({});
+        setUsersMap((prev) => {
+          const map = { ...prev };
+          (Array.isArray(users) ? users : []).forEach((u: any) => {
+            if (u?.id) map[String(u.id)] = u;
+          });
+          return map;
+        });
+      }
     } catch (err) {
       console.error('Messages load error:', err);
       setMessages([]);
@@ -175,11 +217,39 @@ export const Messages: React.FC<MessagesProps> = ({
       .sort((a, b) => new Date(msgTs(b.last)).getTime() - new Date(msgTs(a.last)).getTime());
   }, [messages, myId, usersMap, appUser?.role, coachId]);
 
-  const filteredConversations = useMemo(() => {
+  /** Côté coach : une ligne par client (même sans message) + conversations hors liste clients. */
+  const rowsForList = useMemo(() => {
+    if (appUser?.role !== 'coach' || !myId) return conversations;
+    const convById = new Map(conversations.map((c) => [c.otherId, c]));
+    const clientIds = new Set(coachClients.map((c) => String(c.id)));
+    const fromClients = coachClients.map((client) => {
+      const id = String(client.id);
+      const hit = convById.get(id);
+      if (hit) return hit;
+      return {
+        otherId: id,
+        last: {
+          content: '',
+          created_at: '1970-01-01T00:00:00.000Z',
+          sender_id: myId,
+          receiver_id: id,
+        },
+        unread: 0,
+        name: String(client.name ?? 'Athlète'),
+        avatar: client.avatar ?? null,
+      };
+    });
+    const orphans = conversations.filter((c) => !clientIds.has(c.otherId));
+    const merged = [...fromClients, ...orphans];
+    merged.sort((a, b) => new Date(msgTs(b.last)).getTime() - new Date(msgTs(a.last)).getTime());
+    return merged;
+  }, [appUser?.role, myId, conversations, coachClients]);
+
+  const filteredRows = useMemo(() => {
     const q = normalizeText(searchQuery);
-    if (!q) return conversations;
-    return conversations.filter((c) => normalizeText(String(c.name ?? '')).includes(q));
-  }, [conversations, searchQuery]);
+    if (!q) return rowsForList;
+    return rowsForList.filter((c) => normalizeText(String(c.name ?? '')).includes(q));
+  }, [rowsForList, searchQuery]);
 
   const threadMessages = useMemo(() => {
     if (!myId || !selectedOtherId) return [];
@@ -344,7 +414,7 @@ export const Messages: React.FC<MessagesProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full h-11 pl-10 pr-4 bg-slate-100 dark:bg-slate-900 border-none rounded-lg focus:ring-2 focus:ring-primary text-sm placeholder:text-slate-500 transition-all outline-none"
-                  placeholder="Rechercher..."
+                  placeholder={appUser?.role === 'coach' ? 'Rechercher un client…' : 'Rechercher…'}
                   type="text"
                 />
               </div>
@@ -355,9 +425,15 @@ export const Messages: React.FC<MessagesProps> = ({
                 <div className="flex justify-center py-10">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                 </div>
-              ) : filteredConversations.length === 0 ? (
+              ) : filteredRows.length === 0 ? (
                 <div className="text-center py-10 px-4">
-                  <p className="text-slate-500 mb-4">Aucune conversation.</p>
+                  <p className="text-slate-500 mb-4">
+                    {appUser?.role === 'coach' && normalizeText(searchQuery) && rowsForList.length > 0
+                      ? 'Aucun client ne correspond à ta recherche.'
+                      : appUser?.role === 'coach' && rowsForList.length === 0
+                        ? 'Aucun client lié à ton compte pour l’instant.'
+                        : 'Aucune conversation.'}
+                  </p>
                   {appUser?.role === 'athlete' && (
                     <div className="text-sm text-slate-600 dark:text-slate-400 space-y-2">
                       <p>Pour contacter votre coach, assurez-vous d’être lié à son compte.</p>
@@ -376,7 +452,9 @@ export const Messages: React.FC<MessagesProps> = ({
                   )}
                 </div>
               ) : (
-                filteredConversations.map((conv) => (
+                filteredRows.map((conv) => {
+                  const hasPreview = Boolean(String(conv.last?.content ?? '').trim());
+                  return (
                   <div
                     key={conv.otherId}
                     onClick={() => openConversation(conv.otherId)}
@@ -394,12 +472,16 @@ export const Messages: React.FC<MessagesProps> = ({
                       <div className="flex justify-between items-baseline mb-0.5">
                         <h3 className="font-bold text-base truncate">{conv.name}</h3>
                         <span className={`text-xs ${conv.unread > 0 ? 'font-semibold text-primary' : 'text-slate-500'}`}>
-                          {formatMessageTime(msgTs(conv.last))}
+                          {hasPreview ? formatMessageTime(msgTs(conv.last)) : ''}
                         </span>
                       </div>
                       <div className="flex justify-between items-center gap-2">
                         <p className={`text-sm truncate ${conv.unread > 0 ? 'text-slate-900 dark:text-slate-100 font-medium' : 'text-slate-500 dark:text-slate-400'}`}>
-                          {conv.last.sender_id === myId ? 'Vous : ' : ''}{conv.last.content || ''}
+                          {hasPreview
+                            ? `${conv.last.sender_id === myId ? 'Vous : ' : ''}${conv.last.content}`
+                            : appUser?.role === 'coach'
+                              ? 'Nouvelle conversation — appuie pour écrire'
+                              : ''}
                         </p>
                         {conv.unread > 0 && (
                           <span className="flex-shrink-0 bg-primary text-white text-[10px] font-bold min-w-[20px] h-5 flex items-center justify-center rounded-full px-1">
@@ -410,7 +492,8 @@ export const Messages: React.FC<MessagesProps> = ({
                     </div>
                     <ChevronRight size={20} className="text-slate-400" />
                   </div>
-                ))
+                );
+                })
               )}
             </main>
           </div>
