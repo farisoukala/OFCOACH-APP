@@ -202,7 +202,86 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
       case 'accueil':
         return (
           <div className="space-y-8">
+            {onNavigateToCalendar && (
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold flex items-center gap-2">
+                    <Calendar className="text-primary" size={20} />
+                    Rendez-vous coach
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToCalendar()}
+                    className="text-xs font-bold text-primary hover:underline"
+                  >
+                    Planning complet
+                  </button>
+                </div>
+                {nextCoachAppt ? (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToCalendar()}
+                    className="w-full text-left bg-sky-500/10 dark:bg-sky-500/15 border border-sky-500/25 rounded-2xl p-4 space-y-1 hover:bg-sky-500/15 transition-colors"
+                  >
+                    <p className="text-xs font-bold uppercase text-sky-600 dark:text-sky-400">Prochain créneau</p>
+                    <p className="font-bold text-slate-900 dark:text-slate-100">{nextCoachAppt.title}</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">
+                      {new Date(nextCoachAppt.starts_at).toLocaleString('fr-FR', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                      {nextCoachAppt.duration_minutes != null ? ` · ${nextCoachAppt.duration_minutes} min` : ''}
+                    </p>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onNavigateToCalendar()}
+                    className="w-full py-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-500 text-sm font-medium hover:border-primary/50 hover:text-primary transition-colors"
+                  >
+                    Aucun rendez-vous à venir — ouvre le planning pour tes événements perso
+                  </button>
+                )}
+              </section>
+            )}
+
             <section>
+              <h2 className="text-lg font-bold mb-4 tracking-wide">OBJECTIF</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-200 dark:bg-slate-800 p-4 rounded-2xl border border-transparent dark:border-slate-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-2 bg-orange-500/10 rounded-lg">
+                      <TrendingUp className="text-orange-500" size={20} />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Objectif calories</span>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold tracking-tight">{nutrition?.calories_target ?? '--'}</span>
+                    <span className="text-xs text-slate-500">kcal</span>
+                  </div>
+                </div>
+                <div className="bg-slate-200 dark:bg-slate-800 p-4 rounded-2xl border border-transparent dark:border-slate-700 min-h-[108px] flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 bg-emerald-500/10 rounded-lg shrink-0">
+                      <Target className="text-emerald-600 dark:text-emerald-400" size={20} />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Objectif coach</span>
+                  </div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-4">
+                    {coachingObjective || (
+                      <span className="font-medium text-slate-500 dark:text-slate-400">
+                        Non défini — ton coach peut l’indiquer dans ton profil (ex. perte de poids, prise de masse, santé).
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="pb-2">
               <div className="flex items-center justify-between mb-2 gap-2">
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <Dumbbell className="text-primary shrink-0" size={20} />
@@ -379,85 +458,6 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
                   </button>
                 </div>
               )}
-            </section>
-
-            {onNavigateToCalendar && (
-              <section>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-bold flex items-center gap-2">
-                    <Calendar className="text-primary" size={20} />
-                    Rendez-vous coach
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => onNavigateToCalendar()}
-                    className="text-xs font-bold text-primary hover:underline"
-                  >
-                    Planning complet
-                  </button>
-                </div>
-                {nextCoachAppt ? (
-                  <button
-                    type="button"
-                    onClick={() => onNavigateToCalendar()}
-                    className="w-full text-left bg-sky-500/10 dark:bg-sky-500/15 border border-sky-500/25 rounded-2xl p-4 space-y-1 hover:bg-sky-500/15 transition-colors"
-                  >
-                    <p className="text-xs font-bold uppercase text-sky-600 dark:text-sky-400">Prochain créneau</p>
-                    <p className="font-bold text-slate-900 dark:text-slate-100">{nextCoachAppt.title}</p>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {new Date(nextCoachAppt.starts_at).toLocaleString('fr-FR', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                      {nextCoachAppt.duration_minutes != null ? ` · ${nextCoachAppt.duration_minutes} min` : ''}
-                    </p>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => onNavigateToCalendar()}
-                    className="w-full py-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-500 text-sm font-medium hover:border-primary/50 hover:text-primary transition-colors"
-                  >
-                    Aucun rendez-vous à venir — ouvre le planning pour tes événements perso
-                  </button>
-                )}
-              </section>
-            )}
-
-            <section>
-              <h2 className="text-lg font-bold mb-4 tracking-wide">OBJECTIF</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-slate-200 dark:bg-slate-800 p-4 rounded-2xl border border-transparent dark:border-slate-700">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-2 bg-orange-500/10 rounded-lg">
-                      <TrendingUp className="text-orange-500" size={20} />
-                    </div>
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Objectif calories</span>
-                  </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold tracking-tight">{nutrition?.calories_target ?? '--'}</span>
-                    <span className="text-xs text-slate-500">kcal</span>
-                  </div>
-                </div>
-                <div className="bg-slate-200 dark:bg-slate-800 p-4 rounded-2xl border border-transparent dark:border-slate-700 min-h-[108px] flex flex-col">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="p-2 bg-emerald-500/10 rounded-lg shrink-0">
-                      <Target className="text-emerald-600 dark:text-emerald-400" size={20} />
-                    </div>
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Objectif coach</span>
-                  </div>
-                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-4">
-                    {coachingObjective || (
-                      <span className="font-medium text-slate-500 dark:text-slate-400">
-                        Non défini — ton coach peut l’indiquer dans ton profil (ex. perte de poids, prise de masse, santé).
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
             </section>
           </div>
         );
