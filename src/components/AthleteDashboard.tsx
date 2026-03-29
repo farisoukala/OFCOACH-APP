@@ -625,11 +625,16 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
               </button>
             )}
             <button
+              type="button"
               onClick={() => onNavigateToNotifications?.()}
               className="relative p-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/20 transition-colors"
             >
               <Bell size={20} />
-              <span className="absolute top-2 right-2 size-2 bg-primary rounded-full ring-2 ring-background-dark"></span>
+              {unreadNotifications > 0 && (
+                <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-primary text-white text-[10px] font-bold rounded-full ring-2 ring-background-light dark:ring-background-dark">
+                  {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                </span>
+              )}
             </button>
             <button
               onClick={() => signOut()}
