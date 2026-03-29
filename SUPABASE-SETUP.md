@@ -58,6 +58,8 @@ Tu peux ajouter plusieurs lignes (localhost + prod, ou plusieurs domaines).
 
 Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requête → coller le contenu du fichier → Run).
 
+**Nouvelles évolutions** : à partir de maintenant, versionner les scripts dans le dossier **`supabase/migrations/`** (nom `YYYYMMDDHHMMSS_description.sql`) et consigner chaque exécution sur un projet (ref Supabase, environnement) selon **`supabase/migrations/README.md`**. Les fichiers **`supabase_*.sql` à la racine** restent la référence pour les bases déjà installées selon le tableau ci‑dessous.
+
 ### Étape 1 : Schéma de base
 
 **Fichier : `supabase_schema.sql`**

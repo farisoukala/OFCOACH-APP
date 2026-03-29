@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { fetchClients } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import type { PublicUserRow } from '../types/rows';
 
 interface CoachDashboardProps {
   onNavigateToClients: () => void;
@@ -29,7 +30,7 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
   onNavigateToSettings,
   onOpenClientProfile,
 }) => {
-  const [clients, setClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<PublicUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const { signOut, appUser } = useAuth();
@@ -57,7 +58,7 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
     const loadRecentClients = async () => {
       try {
         const data = await fetchClients(appUser.id);
-        setClients(Array.isArray(data) ? data : []);
+        setClients(data ?? []);
       } catch (error) {
         console.error('Error loading recent clients:', error);
       } finally {

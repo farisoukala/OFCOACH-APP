@@ -7,6 +7,9 @@ coverage/
 .env*
 !.env.example
 
+# Journal local des migrations SQL appliquées (copie du template CSV)
+supabase/migrations/apply_journal.local.csv
+
 # Base de données locale (SQLite)
 *.db
 ofcoach.db

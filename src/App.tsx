@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Screen } from './types';
 import { Login } from './components/Login';
 import { Register } from './components/Register';
@@ -22,14 +22,14 @@ export default function App() {
   const [notificationsReturnTo, setNotificationsReturnTo] = useState<Screen>('athlete_dashboard');
   const { role, session, loading, needsPasswordReset, clearPasswordReset } = useAuth();
 
-  useEffect(() => {
-    if (!session) {
-      setCurrentScreen('login');
-      setSelectedClientId(null);
-    }
-  }, [session]);
+  /** Hors session : toujours l’écran login (évite un effet qui réinitialisait l’état). */
+  const displayScreen = !session ? 'login' : currentScreen;
+  const effectiveClientId = session ? selectedClientId : null;
+  const effectiveOpenMessageUserId = session ? messageOpenWithUserId : null;
 
   const handleLogin = () => {
+    setSelectedClientId(null);
+    setMessageOpenWithUserId(null);
     if (role === 'coach') {
       setCurrentScreen('coach_dashboard');
     } else {
@@ -50,7 +50,7 @@ export default function App() {
       );
     }
 
-    switch (currentScreen) {
+    switch (displayScreen) {
       case 'login':
         return (
           <Login
@@ -103,12 +103,12 @@ export default function App() {
       case 'client_profile':
         return (
           <ClientProfile
-            selectedClientId={selectedClientId}
+            selectedClientId={effectiveClientId}
             onBack={() => setCurrentScreen('client_list')}
             onNavigateToMessages={
-              selectedClientId
+              effectiveClientId
                 ? () => {
-                    setMessageOpenWithUserId(selectedClientId);
+                    setMessageOpenWithUserId(effectiveClientId);
                     setCurrentScreen('messages');
                   }
                 : undefined
@@ -129,7 +129,7 @@ export default function App() {
       case 'messages':
         return (
           <Messages
-            openWithUserId={messageOpenWithUserId}
+            openWithUserId={effectiveOpenMessageUserId}
             onClearOpenWith={() => setMessageOpenWithUserId(null)}
             onBack={() => setCurrentScreen(role === 'coach' ? 'coach_dashboard' : 'athlete_dashboard')}
             onNavigateToDashboard={() => setCurrentScreen(role === 'coach' ? 'coach_dashboard' : 'athlete_dashboard')}

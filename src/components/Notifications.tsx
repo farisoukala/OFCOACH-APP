@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowLeft, Bell, CheckCheck } from 'lucide-react';
-import { fetchNotifications, markNotificationRead, markAllNotificationsRead } from '../services/api';
+import {
+  fetchNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  type NotificationRow,
+} from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 function formatNotifDate(createdAt: string): string {
@@ -24,7 +29,7 @@ interface NotificationsProps {
 export const Notifications: React.FC<NotificationsProps> = ({ onBack }) => {
   const { appUser } = useAuth();
   const userId = appUser?.id;
-  const [list, setList] = useState<any[]>([]);
+  const [list, setList] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
 

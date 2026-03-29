@@ -16,6 +16,7 @@ import {
 } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from '../lib/toast';
+import type { CalendarListRow } from '../types/rows';
 
 const MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 const JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -34,7 +35,7 @@ function isSameDay(a: Date, b: Date): boolean {
 /** Transforme un RDV coach (starts_at) en ligne compatible avec le calendrier perso. */
 function appointmentToCalendarRow(a: {
   id: string;
-  title: string;
+  title?: string;
   starts_at: string;
   duration_minutes?: number | null;
   notes?: string | null;
@@ -50,7 +51,7 @@ function appointmentToCalendarRow(a: {
   return {
     id: `appt-${a.id}`,
     rawId: a.id,
-    title: a.title,
+    title: a.title ?? 'Rendez-vous',
     date,
     time,
     duration,
@@ -66,7 +67,7 @@ interface CalendarProps {
 }
 
 export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<CalendarListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
@@ -82,7 +83,7 @@ export const Calendar: React.FC<CalendarProps> = ({ onBack }) => {
     if (!userId) return;
     try {
       const personal = await fetchCalendarEvents(userId).catch(() => []);
-      let merged: any[] = Array.isArray(personal) ? [...personal] : [];
+      let merged: CalendarListRow[] = Array.isArray(personal) ? [...(personal as CalendarListRow[])] : [];
       if (appUser?.role === 'athlete') {
         const appts = await fetchAthleteAppointments(userId).catch(() => []);
         const list = Array.isArray(appts) ? appts : [];

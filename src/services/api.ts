@@ -1,14 +1,16 @@
 import { supabase } from '../lib/supabase';
+import type { WorkoutSchedulePick } from '../lib/workoutPlanning';
+import type { MessageRow, PublicUserRow } from '../types/rows';
 
 /** Liste des athlètes. Si coachId est fourni, ne retourne que les athlètes liés à ce coach. */
-export async function fetchClients(coachId?: string | null) {
+export async function fetchClients(coachId?: string | null): Promise<PublicUserRow[] | null> {
   let q = supabase.from('users').select('*').eq('role', 'athlete');
   if (coachId) {
     q = q.eq('coach_id', coachId);
   }
   const { data, error } = await q;
   if (error) throw error;
-  return data;
+  return data as PublicUserRow[] | null;
 }
 
 export async function fetchClientById(id: string) {
@@ -81,10 +83,8 @@ export async function updateUserProfile(
   return profile as Record<string, unknown>;
 }
 
-export async function fetchMessages() {
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*');
+export async function fetchMessages(): Promise<MessageRow[]> {
+  const { data, error } = await supabase.from('messages').select('*');
 
   if (error) throw error;
   const list = Array.isArray(data) ? data : [];
@@ -93,7 +93,7 @@ export async function fetchMessages() {
     const tb = (b.created_at || b.timestamp || '').toString();
     return new Date(tb).getTime() - new Date(ta).getTime();
   });
-  return list;
+  return list as MessageRow[];
 }
 
 /** Envoyer un message. Sans .select() après insert : évite erreurs 409 / PGRST si le RETURNING est filtré par la RLS. */
@@ -112,11 +112,11 @@ export async function sendMessage(senderId: string, receiverId: string, content:
 }
 
 /** Récupérer des utilisateurs par liste d'ids (pour noms/avatars des conversations). RLS doit autoriser la lecture des correspondants. */
-export async function fetchUsersByIds(ids: string[]) {
+export async function fetchUsersByIds(ids: string[]): Promise<PublicUserRow[]> {
   if (ids.length === 0) return [];
   const { data, error } = await supabase.from('users').select('id, name, avatar, role').in('id', ids);
   if (error) throw error;
-  return data || [];
+  return (data || []) as PublicUserRow[];
 }
 
 /** Marquer des messages comme lus (pour le destinataire). Par lots : évite URL trop longue et erreurs PostgREST. */
@@ -134,7 +134,7 @@ export async function markMessagesAsRead(messageIds: string[]) {
   }
 }
 
-export async function fetchWorkoutsByAthlete(athleteId: string) {
+export async function fetchWorkoutsByAthlete(athleteId: string): Promise<WorkoutSchedulePick[]> {
   const { data, error } = await supabase
     .from('workouts')
     .select('*, exercises(*)')
@@ -143,7 +143,7 @@ export async function fetchWorkoutsByAthlete(athleteId: string) {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as WorkoutSchedulePick[];
 }
 
 export async function updateWorkout(
@@ -162,8 +162,7 @@ export async function updateWorkout(
       p_workout_id: workoutId,
     });
     if (!error) {
-      // garder une réponse compatible pour l'appelant
-      return { id: workoutId, status: 'completed' } as any;
+      return { id: workoutId, status: 'completed' as const };
     }
     // fallback: on tente la route classique si la RPC n'existe pas encore
     if (error.code !== '42883') throw error; // undefined_function
@@ -185,7 +184,27 @@ export async function deleteWorkout(workoutId: string) {
   if (error) throw error;
 }
 
-export async function createWorkout(workoutData: any) {
+export type CreateWorkoutExerciseInput = {
+  id?: string;
+  name?: string;
+  sets?: string | number | null;
+  reps?: string | number | null;
+  weight?: string | number | null;
+  rest_time?: string | number | null;
+};
+
+export type CreateWorkoutInput = {
+  id: string;
+  athlete_id: string;
+  coach_id: string;
+  title?: string;
+  description?: string | null;
+  date?: string | null;
+  status?: string | null;
+  exercises?: CreateWorkoutExerciseInput[];
+};
+
+export async function createWorkout(workoutData: CreateWorkoutInput) {
   const { exercises, ...workout } = workoutData;
 
   const { data: workoutResult, error: workoutError } = await supabase
@@ -197,7 +216,7 @@ export async function createWorkout(workoutData: any) {
   if (workoutError) throw workoutError;
 
   if (exercises && exercises.length > 0) {
-    const exercisesWithWorkoutId = exercises.map((ex: any) => ({
+    const exercisesWithWorkoutId = exercises.map((ex) => ({
       // La table exercises.id attend un UUID.
       // On ne réutilise pas l'id UI local (souvent Date.now()).
       id: crypto.randomUUID(),
@@ -271,7 +290,20 @@ export async function insertExerciseForWorkout(
   if (error) throw error;
 }
 
-export async function fetchNutritionPlan(athleteId: string) {
+export type NutritionPlanRow = {
+  id: string;
+  athlete_id?: string;
+  coach_id?: string;
+  title?: string | null;
+  date?: string | null;
+  calories_target?: number | null;
+  protein_target?: number | null;
+  carbs_target?: number | null;
+  fat_target?: number | null;
+  created_at?: string | null;
+};
+
+export async function fetchNutritionPlan(athleteId: string): Promise<NutritionPlanRow | null> {
   const { data, error } = await supabase
     .from('nutrition_plans')
     .select('*')
@@ -285,7 +317,7 @@ export async function fetchNutritionPlan(athleteId: string) {
     const tb = (b.created_at || b.date || '').toString();
     return new Date(tb).getTime() - new Date(ta).getTime();
   });
-  return list[0] || null;
+  return (list[0] || null) as NutritionPlanRow | null;
 }
 
 export interface NutritionPlanInput {
@@ -334,7 +366,17 @@ export async function deleteNutritionPlan(planId: string) {
   if (error) throw error;
 }
 
-export async function fetchProgressLogs(athleteId: string) {
+export type ProgressLogRow = {
+  id: string;
+  athlete_id?: string;
+  date?: string | null;
+  weight?: number | null;
+  body_fat?: number | null;
+  notes?: string | null;
+  created_at?: string | null;
+};
+
+export async function fetchProgressLogs(athleteId: string): Promise<ProgressLogRow[]> {
   const { data, error } = await supabase
     .from('progress_logs')
     .select('*')
@@ -342,7 +384,7 @@ export async function fetchProgressLogs(athleteId: string) {
     .order('created_at', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as ProgressLogRow[];
 }
 
 export interface ProgressLogInput {
@@ -489,8 +531,18 @@ export async function deleteCalendarEvent(eventId: string) {
   if (error) throw error;
 }
 
+export type AthleteAppointmentRow = {
+  id: string;
+  athlete_id?: string;
+  coach_id?: string;
+  title?: string;
+  starts_at?: string;
+  duration_minutes?: number | null;
+  notes?: string | null;
+};
+
 /** Rendez-vous coach → athlète (table athlete_appointments). */
-export async function fetchAthleteAppointments(athleteId: string) {
+export async function fetchAthleteAppointments(athleteId: string): Promise<AthleteAppointmentRow[]> {
   const { data, error } = await supabase
     .from('athlete_appointments')
     .select('*')
@@ -498,7 +550,7 @@ export async function fetchAthleteAppointments(athleteId: string) {
     .order('starts_at', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as AthleteAppointmentRow[];
 }
 
 export interface AthleteAppointmentInput {
@@ -563,7 +615,17 @@ export async function updateAthleteAppointment(appointmentId: string, updates: A
   return data;
 }
 
-export async function fetchNotifications(userId: string) {
+export type NotificationRow = {
+  id: string;
+  user_id?: string;
+  type?: string;
+  title?: string | null;
+  body?: string | null;
+  is_read?: boolean | null;
+  created_at?: string | null;
+};
+
+export async function fetchNotifications(userId: string): Promise<NotificationRow[]> {
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
@@ -571,7 +633,7 @@ export async function fetchNotifications(userId: string) {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as NotificationRow[];
 }
 
 /** Compte les notifications non lues (is_read faux ou absent), aligné sur l’écran Notifications. */

@@ -3,6 +3,7 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useCallback,
   ReactNode,
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
@@ -53,6 +54,18 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function buildAppUserFromAuth(authUser: User): AppUser {
+  return {
+    id: authUser.id,
+    email: authUser.email ?? '',
+    name: (authUser.user_metadata?.name as string | null) ?? null,
+    role: (authUser.user_metadata?.role as AppUserRole | undefined) ?? null,
+    avatar: (authUser.user_metadata?.avatar as string | null) ?? null,
+    status: null,
+    coach_id: null,
+  };
+}
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -60,19 +73,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [needsPasswordReset, setNeedsPasswordReset] = useState(false);
 
-  const buildAppUserFromAuth = (authUser: User): AppUser => ({
-    id: authUser.id,
-    email: authUser.email ?? '',
-    name: (authUser.user_metadata?.name as string | null) ?? null,
-    role:
-      (authUser.user_metadata?.role as AppUserRole | undefined) ??
-      null,
-    avatar: (authUser.user_metadata?.avatar as string | null) ?? null,
-    status: null,
-    coach_id: null,
-  });
-
-  const loadProfile = async (authUser: User | null) => {
+  const loadProfile = useCallback(async (authUser: User | null) => {
     if (!authUser) {
       setAppUser(null);
       return;
@@ -115,7 +116,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch {
       setAppUser(buildAppUserFromAuth(authUser));
     }
-  };
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -151,7 +152,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [loadProfile]);
 
   const signInWithEmail: AuthContextValue['signInWithEmail'] = async ({
     email,

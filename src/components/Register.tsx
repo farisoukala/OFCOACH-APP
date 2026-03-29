@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { 
   ArrowLeft, 
   User, 
-  Mail, 
-  Lock, 
   ChevronRight, 
   Dumbbell, 
   Weight, 

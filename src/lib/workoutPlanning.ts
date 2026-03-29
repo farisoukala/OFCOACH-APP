@@ -38,8 +38,29 @@ export function addDaysLocal(d: Date, n: number): Date {
   return x;
 }
 
+/** Exercice embarqué dans une séance (liste renvoyée par Supabase). */
+export type WorkoutExerciseRow = {
+  id?: string;
+  name?: string;
+  sets?: string | number;
+  reps?: string | number;
+  weight?: string | number | null;
+  rest_time?: string | number | null;
+};
+
+/** Ligne minimale pour le tri / mise en avant (champs optionnels selon les requêtes Supabase). */
+export type WorkoutSchedulePick = {
+  id?: string;
+  date?: string | null;
+  status?: string | null;
+  title?: string | null;
+  description?: string | null;
+  created_at?: string | null;
+  exercises?: WorkoutExerciseRow[] | null;
+};
+
 /** Séance mise en avant : priorité aux non terminées — aujourd’hui, puis prochaine date, puis la plus récente en retard. */
-export function pickFeaturedWorkout(workouts: { date?: string | null; status?: string | null }[]): any | null {
+export function pickFeaturedWorkout(workouts: WorkoutSchedulePick[]): WorkoutSchedulePick | null {
   if (!workouts?.length) return null;
   const today = localTodayIso();
   const pending = workouts.filter((w) => w.status !== 'completed');
@@ -65,7 +86,7 @@ export function pickFeaturedWorkout(workouts: { date?: string | null; status?: s
   return pool[0];
 }
 
-export function sortWorkoutsBySchedule(workouts: any[]): any[] {
+export function sortWorkoutsBySchedule(workouts: WorkoutSchedulePick[]): WorkoutSchedulePick[] {
   const copy = [...workouts];
   copy.sort((a, b) => {
     const da = a?.date && /^\d{4}-\d{2}-\d{2}$/.test(String(a.date)) ? String(a.date) : '';

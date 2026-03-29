@@ -1,19 +1,26 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Flame, Pencil, X, Target } from 'lucide-react';
-import { fetchNutritionPlan, updateNutritionPlan } from '../services/api';
+import { fetchNutritionPlan, updateNutritionPlan, type NutritionPlanRow } from '../services/api';
 import { localTodayIso } from '../lib/workoutPlanning';
 import { useAuth } from '../context/AuthContext';
 
 const MACRO_COLORS: Record<string, string> = { Protéines: '#3b82f6', Glucides: '#f59e0b', Lipides: '#f43f5e' };
 
-function formatErr(err: any, fallback: string) {
-  if (!err) return fallback;
-  const parts = [err.code && `[${err.code}]`, err.message, err.details, err.hint].filter(Boolean);
+function formatErr(err: unknown, fallback: string): string {
+  if (err == null) return fallback;
+  if (typeof err !== 'object') return String(err);
+  const o = err as Record<string, unknown>;
+  const parts = [
+    o.code != null ? `[${o.code}]` : null,
+    o.message != null ? String(o.message) : null,
+    o.details != null ? String(o.details) : null,
+    o.hint != null ? String(o.hint) : null,
+  ].filter((x): x is string => x != null && x !== '');
   return parts.length ? parts.join(' ') : fallback;
 }
 
 export const Nutrition: React.FC = () => {
-  const [plan, setPlan] = useState<any>(null);
+  const [plan, setPlan] = useState<NutritionPlanRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
@@ -87,7 +94,7 @@ export const Nutrition: React.FC = () => {
       await loadPlan();
       setShowEditModal(false);
       setEditError(null);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
       setEditError(
         formatErr(e, 'Impossible d’enregistrer. Vérifie que les droits RLS nutrition sont bien configurés sur Supabase.')

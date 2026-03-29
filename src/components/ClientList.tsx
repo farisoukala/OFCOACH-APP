@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { fetchClients, linkAthleteByEmail } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import type { PublicUserRow } from '../types/rows';
 
 interface ClientListProps {
   onSelectClient: (id: string) => void;
@@ -29,7 +30,7 @@ export const ClientList: React.FC<ClientListProps> = ({
   onNavigateToCalendar,
   onNavigateToDashboard
 }) => {
-  const [clients, setClients] = useState<any[]>([]);
+  const [clients, setClients] = useState<PublicUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,7 +57,7 @@ export const ClientList: React.FC<ClientListProps> = ({
     if (!appUser?.id) return;
     try {
       const data = await fetchClients(appUser.id);
-      setClients(data);
+      setClients(data ?? []);
     } catch (error) {
       console.error('Error loading clients:', error);
     } finally {

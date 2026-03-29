@@ -14,7 +14,6 @@ import {
   Pencil,
   Activity,
   HeartPulse,
-  MoreVertical,
   MessageSquare,
   Utensils,
   Calendar,
@@ -39,8 +38,18 @@ import {
   createAthleteAppointment,
   updateAthleteAppointment,
   deleteAthleteAppointment,
+  type BodyMeasurementSnapshot,
+  type NutritionPlanRow,
+  type AthleteAppointmentRow,
 } from '../services/api';
-import { localTodayIso, nextOccurrenceJsWeekday, sortWorkoutsBySchedule, weekdayLabelFrFromIso } from '../lib/workoutPlanning';
+import {
+  localTodayIso,
+  nextOccurrenceJsWeekday,
+  sortWorkoutsBySchedule,
+  weekdayLabelFrFromIso,
+  type WorkoutSchedulePick,
+  type WorkoutExerciseRow,
+} from '../lib/workoutPlanning';
 import { toast } from '../lib/toast';
 import { useAuth } from '../context/AuthContext';
 import { upsertBodyMeasurementSnapshot } from '../services/api';
@@ -76,13 +85,15 @@ function splitIsoToLocalDateTime(iso: string): { date: string; time: string } {
   return { date: `${y}-${m}-${day}`, time: `${h}:${min}` };
 }
 
-const formatSupabaseError = (err: any, fallback: string) => {
-  if (!err) return fallback;
+const formatSupabaseError = (err: unknown, fallback: string): string => {
+  if (err == null) return fallback;
+  if (typeof err !== 'object') return String(err);
+  const o = err as Record<string, unknown>;
   const parts: string[] = [];
-  if (err.code) parts.push(`[${err.code}]`);
-  if (err.message) parts.push(err.message);
-  if (err.details) parts.push(`details: ${err.details}`);
-  if (err.hint) parts.push(`hint: ${err.hint}`);
+  if (o.code != null) parts.push(`[${o.code}]`);
+  if (o.message != null) parts.push(String(o.message));
+  if (o.details != null) parts.push(`details: ${String(o.details)}`);
+  if (o.hint != null) parts.push(`hint: ${String(o.hint)}`);
   if (parts.length > 0) return parts.join(' ');
 
   try {
@@ -120,11 +131,35 @@ function exercisePayloadFromCoachForm(ex: {
   };
 }
 
+type CoachExerciseFormRow = {
+  id: string;
+  name: string;
+  sets: string | number;
+  reps: string;
+  weight: string | number;
+  rest_time: string;
+};
+
+const MEASUREMENT_METRICS = [
+  'taille_cm',
+  'tour_poitrine_cm',
+  'tour_ventre_cm',
+  'tour_hanche_cm',
+  'tour_bras_cm',
+  'tour_epaule_cm',
+  'tour_mollet_cm',
+] as const;
+type MeasurementMetricKey = (typeof MEASUREMENT_METRICS)[number];
+
+function isMeasurementMetricKey(s: string): s is MeasurementMetricKey {
+  return (MEASUREMENT_METRICS as readonly string[]).includes(s);
+}
+
 export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedClientId, onNavigateToMessages }) => {
   const [showWorkoutModal, setShowWorkoutModal] = useState(false);
   const [workoutTitle, setWorkoutTitle] = useState('');
   const [workoutDesc, setWorkoutDesc] = useState('');
-  const [exercises, setExercises] = useState<any[]>([]);
+  const [exercises, setExercises] = useState<CoachExerciseFormRow[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [client, setClient] = useState<{
     id: string; name: string; email?: string; avatar?: string | null; status?: string | null;
@@ -149,7 +184,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     tour_epaule_cm: '',
     tour_mollet_cm: '',
   });
-  const [nutritionPlan, setNutritionPlan] = useState<any>(null);
+  const [nutritionPlan, setNutritionPlan] = useState<NutritionPlanRow | null>(null);
   const [showNutritionModal, setShowNutritionModal] = useState(false);
   const [savingNutrition, setSavingNutrition] = useState(false);
   const [nutritionForm, setNutritionForm] = useState({ title: 'Plan du jour', date: '', calories_target: 2000, protein_target: 150, carbs_target: 250, fat_target: 70 });
@@ -157,10 +192,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [workoutScheduledDate, setWorkoutScheduledDate] = useState(() => localTodayIso());
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [editingWorkoutInitialExerciseIds, setEditingWorkoutInitialExerciseIds] = useState<string[]>([]);
-  const [clientWorkouts, setClientWorkouts] = useState<any[]>([]);
+  const [clientWorkouts, setClientWorkouts] = useState<WorkoutSchedulePick[]>([]);
   const [workoutsLoading, setWorkoutsLoading] = useState(false);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
-  const [clientAppointments, setClientAppointments] = useState<any[]>([]);
+  const [clientAppointments, setClientAppointments] = useState<AthleteAppointmentRow[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [appointmentSaving, setAppointmentSaving] = useState(false);
@@ -176,10 +211,8 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
   const [nutritionFormError, setNutritionFormError] = useState<string | null>(null);
   const [editingNutritionPlanId, setEditingNutritionPlanId] = useState<string | null>(null);
   const [savingAthleteObjective, setSavingAthleteObjective] = useState(false);
-  const [measurementSnapshots, setMeasurementSnapshots] = useState<any[]>([]);
-  const [measurementMetric, setMeasurementMetric] = useState<
-    'taille_cm' | 'tour_poitrine_cm' | 'tour_ventre_cm' | 'tour_hanche_cm' | 'tour_bras_cm' | 'tour_epaule_cm' | 'tour_mollet_cm'
-  >('tour_ventre_cm');
+  const [measurementSnapshots, setMeasurementSnapshots] = useState<BodyMeasurementSnapshot[]>([]);
+  const [measurementMetric, setMeasurementMetric] = useState<MeasurementMetricKey>('tour_ventre_cm');
   const { appUser } = useAuth();
   const todayIso = localTodayIso();
   const [measurementDate, setMeasurementDate] = useState<string>(todayIso);
@@ -352,7 +385,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     setExercises(exercises.filter(ex => ex.id !== id));
   };
 
-  const updateExercise = (id: string, field: string, value: any) => {
+  const updateExercise = (id: string, field: string, value: string | number) => {
     setExercises(exercises.map(ex => ex.id === id ? { ...ex, [field]: value } : ex));
   };
 
@@ -465,7 +498,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         notes: '',
       });
       setAppointmentFormError(null);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
       setAppointmentFormError(
         formatSupabaseError(
@@ -531,7 +564,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     setShowWorkoutModal(true);
   };
 
-  const openEditWorkoutModal = (w: any) => {
+  const openEditWorkoutModal = (w: WorkoutSchedulePick) => {
     if (!w?.id) return;
     setEditingWorkoutId(String(w.id));
     setWorkoutTitle(String(w.title ?? '').trim() || 'Séance');
@@ -539,9 +572,9 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
     const d = w.date ? String(w.date).slice(0, 10) : '';
     setWorkoutScheduledDate(/^\d{4}-\d{2}-\d{2}$/.test(d) ? d : localTodayIso());
     const exList = Array.isArray(w.exercises) ? w.exercises : [];
-    setEditingWorkoutInitialExerciseIds(exList.map((e: any) => String(e.id)));
+    setEditingWorkoutInitialExerciseIds(exList.map((e: WorkoutExerciseRow) => String(e.id)));
     setExercises(
-      exList.map((ex: any) => ({
+      exList.map((ex: WorkoutExerciseRow) => ({
         id: String(ex.id),
         name: String(ex.name ?? ''),
         sets: ex.sets ?? '',
@@ -565,7 +598,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       if (editingWorkoutId === workoutId) closeWorkoutModal();
     } catch (e) {
       console.error(e);
-      toast.error('Suppression impossible', formatSupabaseError(e as any, 'Impossible de supprimer la séance.'));
+      toast.error('Suppression impossible', formatSupabaseError(e, 'Impossible de supprimer la séance.'));
     }
   };
 
@@ -636,7 +669,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
         setWorkoutScheduledDate(localTodayIso());
         toast.success('Séance créée avec succès');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving workout:', error);
       const msg = formatSupabaseError(
         error,
@@ -692,7 +725,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       await deleteNutritionPlan(nutritionPlan.id);
       setNutritionPlan(await fetchNutritionPlan(selectedClientId));
       toast.success('Plan supprimé.');
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
       toast.error('Suppression impossible', formatSupabaseError(e, 'Impossible de supprimer le plan.'));
     }
@@ -742,7 +775,7 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
       setEditingNutritionPlanId(null);
       setNutritionFormError(null);
       toast.success(isEditMode ? 'Plan nutritionnel mis à jour' : 'Plan nutritionnel créé');
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error(e);
       const msg = formatSupabaseError(
         e,
@@ -931,7 +964,10 @@ export const ClientProfile: React.FC<ClientProfileProps> = ({ onBack, selectedCl
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Mesure</label>
             <select
               value={measurementMetric}
-              onChange={(e) => setMeasurementMetric(e.target.value as any)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (isMeasurementMetricKey(v)) setMeasurementMetric(v);
+              }}
               className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-primary text-sm"
             >
               <option value="tour_ventre_cm">Tour de ventre</option>

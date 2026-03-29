@@ -196,8 +196,16 @@ async function startServer() {
     insertWorkout.run(id, athlete_id, coach_id, title, description, date);
 
     if (exercises && exercises.length > 0) {
+      type ExerciseRow = {
+        id: string;
+        name: string;
+        sets: string | number;
+        reps: string | number;
+        weight: string | number;
+        rest_time: string | number;
+      };
       const insertExercise = db.prepare('INSERT INTO exercises (id, workout_id, name, sets, reps, weight, rest_time) VALUES (?, ?, ?, ?, ?, ?, ?)');
-      exercises.forEach((ex: any) => {
+      (exercises as ExerciseRow[]).forEach((ex) => {
         insertExercise.run(ex.id, id, ex.name, ex.sets, ex.reps, ex.weight, ex.rest_time);
       });
     }

@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dumbbell,
-  Clock,
   ChevronRight,
   Calendar,
   CheckCircle2,
   Play,
+  ArrowLeft,
 } from 'lucide-react';
 import { fetchWorkoutsByAthlete, updateWorkout } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +16,8 @@ import {
   addDaysLocal,
   localDateIso,
   localTodayIso,
+  type WorkoutExerciseRow,
+  type WorkoutSchedulePick,
 } from '../lib/workoutPlanning';
 import { toast } from '../lib/toast';
 
@@ -34,9 +36,11 @@ function formatWorkoutDate(dateStr: string | null): string {
 }
 
 export const Workout: React.FC = () => {
-  const [workouts, setWorkouts] = useState<any[]>([]);
+  const [workouts, setWorkouts] = useState<WorkoutSchedulePick[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingId, setMarkingId] = useState<string | null>(null);
+  /** Séance ouverte depuis la liste (bilan / relecture, y compris terminées). */
+  const [openedWorkoutId, setOpenedWorkoutId] = useState<string | null>(null);
   const { appUser } = useAuth();
   const athleteId = appUser?.id;
 
@@ -61,8 +65,22 @@ export const Workout: React.FC = () => {
   }, [athleteId, loadWorkouts]);
 
   const sortedList = sortWorkoutsBySchedule(workouts);
-  const currentWorkout = pickFeaturedWorkout(workouts);
+  const featuredWorkout = pickFeaturedWorkout(workouts);
+  const currentWorkout = useMemo(() => {
+    if (openedWorkoutId) {
+      const found = workouts.find((w) => w.id === openedWorkoutId);
+      if (found) return found;
+    }
+    return featuredWorkout;
+  }, [openedWorkoutId, workouts, featuredWorkout]);
   const completedCount = workouts.filter((w) => w.status === 'completed').length;
+
+  useEffect(() => {
+    if (!openedWorkoutId) return;
+    if (!workouts.some((w) => w.id === openedWorkoutId)) {
+      setOpenedWorkoutId(null);
+    }
+  }, [openedWorkoutId, workouts]);
 
   const monday = startOfWeekMonday();
   const weekDays = [0, 1, 2, 3, 4, 5, 6].map((i) => {
@@ -80,11 +98,12 @@ export const Workout: React.FC = () => {
     try {
       await updateWorkout(workoutId, { status: 'completed' });
       await loadWorkouts();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
+      const o = err && typeof err === 'object' ? (err as Record<string, unknown>) : {};
       const msg =
-        (err?.code ? `[${err.code}] ` : '') +
-        (err?.message || err?.error_description || err?.hint || 'Erreur lors de la mise à jour.');
+        (o.code ? `[${o.code}] ` : '') +
+        String(o.message ?? o.error_description ?? o.hint ?? 'Erreur lors de la mise à jour.');
       toast.error('Séance non mise à jour', msg);
     } finally {
       setMarkingId(null);
@@ -130,7 +149,7 @@ export const Workout: React.FC = () => {
                 {day.dayWorkouts.length === 0 ? (
                   <p className="text-[10px] text-slate-400">—</p>
                 ) : (
-                  day.dayWorkouts.map((w: any) => (
+                  day.dayWorkouts.map((w: WorkoutSchedulePick) => (
                     <p
                       key={w.id}
                       className={`text-[10px] font-semibold truncate ${
@@ -149,7 +168,21 @@ export const Workout: React.FC = () => {
       </section>
 
       <section>
-        <h2 className="text-lg font-bold mb-4">MA SEANCE</h2>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h2 className="text-lg font-bold">
+            {openedWorkoutId ? 'Bilan de la séance' : 'MA SEANCE'}
+          </h2>
+          {openedWorkoutId && (
+            <button
+              type="button"
+              onClick={() => setOpenedWorkoutId(null)}
+              className="shrink-0 flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+            >
+              <ArrowLeft size={18} aria-hidden />
+              Retour
+            </button>
+          )}
+        </div>
         {loading ? (
           <div className="bg-slate-100 dark:bg-slate-900 h-48 rounded-2xl animate-pulse flex items-center justify-center">
             <Dumbbell className="text-slate-300 animate-spin" size={32} />
@@ -173,7 +206,7 @@ export const Workout: React.FC = () => {
 
             <div className="space-y-3 mb-6">
               {currentWorkout.exercises?.length ? (
-                currentWorkout.exercises.map((ex: any) => (
+                currentWorkout.exercises.map((ex: WorkoutExerciseRow) => (
                   <div key={ex.id} className="flex items-center justify-between py-2 border-b border-primary/10 last:border-0">
                     <div className="flex items-center gap-3">
                       <div className="size-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
@@ -223,26 +256,37 @@ export const Workout: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {sortedList.map((w) => (
-              <div
-                key={w.id}
-                className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-900 rounded-2xl"
-              >
-                <div className="flex items-center gap-4">
-                  <div className={`size-10 rounded-xl flex items-center justify-center ${w.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`}>
-                    {w.status === 'completed' ? <CheckCircle2 size={20} /> : <Dumbbell size={20} />}
+            {sortedList.map((w) => {
+              const wid = w.id;
+              if (!wid) return null;
+              const isOpen = openedWorkoutId === wid;
+              return (
+                <button
+                  key={wid}
+                  type="button"
+                  onClick={() => setOpenedWorkoutId(wid)}
+                  className={`w-full flex items-center justify-between p-4 rounded-2xl text-left transition-colors border ${
+                    isOpen
+                      ? 'bg-primary/10 border-primary/30 ring-1 ring-primary/20'
+                      : 'bg-slate-100 dark:bg-slate-900 border-transparent hover:bg-slate-200/80 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className={`shrink-0 size-10 rounded-xl flex items-center justify-center ${w.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'}`}>
+                      {w.status === 'completed' ? <CheckCircle2 size={20} /> : <Dumbbell size={20} />}
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-sm truncate">{w.title}</h4>
+                      <p className="text-xs text-slate-500">
+                        {formatWorkoutDate(w.date)} • {w.exercises?.length ?? 0} exercice{(w.exercises?.length ?? 0) !== 1 ? 's' : ''}
+                        {w.status === 'completed' && ' • Terminé'}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-sm">{w.title}</h4>
-                    <p className="text-xs text-slate-500">
-                      {formatWorkoutDate(w.date)} • {w.exercises?.length ?? 0} exercices
-                      {w.status === 'completed' && ' • Terminé'}
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight size={18} className="text-slate-400" />
-              </div>
-            ))}
+                  <ChevronRight size={18} className="shrink-0 text-slate-400" aria-hidden />
+                </button>
+              );
+            })}
           </div>
         )}
       </section>

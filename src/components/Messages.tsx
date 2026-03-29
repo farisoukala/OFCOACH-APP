@@ -16,6 +16,7 @@ import { fetchMessages, sendMessage, fetchUsersByIds, markMessagesAsRead, fetchC
 import { toast } from '../lib/toast';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
+import type { MessageRow, PublicUserRow } from '../types/rows';
 
 const defaultAvatar = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=150&auto=format&fit=crop';
 
@@ -52,11 +53,13 @@ function normalizeText(value: string): string {
     .trim();
 }
 
+type UserMapEntry = { id: string; name: string | null; avatar: string | null; role?: string };
+
 /** Groupe les messages par jour pour afficher des séparateurs. */
-function groupMessagesByDate(threadMessages: any[]): { dateLabel: string; messages: any[] }[] {
-  const groups: { dateLabel: string; messages: any[] }[] = [];
+function groupMessagesByDate(threadMessages: MessageRow[]): { dateLabel: string; messages: MessageRow[] }[] {
+  const groups: { dateLabel: string; messages: MessageRow[] }[] = [];
   let currentDate = '';
-  let currentGroup: any[] = [];
+  let currentGroup: MessageRow[] = [];
   threadMessages.forEach((m) => {
     const d = new Date(msgTs(m)).toDateString();
     if (d !== currentDate) {
@@ -93,14 +96,14 @@ export const Messages: React.FC<MessagesProps> = ({
   const { appUser, ensureCurrentUserInDb, refreshProfile } = useAuth();
   const myId = appUser?.id;
 
-  const [messages, setMessages] = useState<any[]>([]);
-  const [usersMap, setUsersMap] = useState<Record<string, { id: string; name: string | null; avatar: string | null; role?: string }>>({});
+  const [messages, setMessages] = useState<MessageRow[]>([]);
+  const [usersMap, setUsersMap] = useState<Record<string, UserMapEntry>>({});
   const [loading, setLoading] = useState(true);
   const [selectedOtherId, setSelectedOtherId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [coachClients, setCoachClients] = useState<any[]>([]);
+  const [coachClients, setCoachClients] = useState<PublicUserRow[]>([]);
   const [athleteCoachId, setAthleteCoachId] = useState<string | null>(null);
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const hasRefreshedProfileForCoach = useRef(false);
@@ -110,7 +113,7 @@ export const Messages: React.FC<MessagesProps> = ({
   /** Pour les athlètes : charger coach_id depuis la table users (au cas où le profil global ne l’a pas). */
   useEffect(() => {
     if (appUser?.role !== 'athlete' || !myId) return;
-    supabase.from('users').select('coach_id').eq('id', myId).single()
+    Promise.resolve(supabase.from('users').select('coach_id').eq('id', myId).single())
       .then(({ data }) => setAthleteCoachId(data?.coach_id ?? null))
       .catch(() => setAthleteCoachId(null));
   }, [appUser?.role, myId]);
@@ -138,7 +141,7 @@ export const Messages: React.FC<MessagesProps> = ({
     if (!coachClients.length) return;
     setUsersMap((prev) => {
       const next = { ...prev };
-      coachClients.forEach((c: any) => {
+      coachClients.forEach((c) => {
         if (c?.id) {
           next[String(c.id)] = {
             id: String(c.id),
@@ -168,10 +171,10 @@ export const Messages: React.FC<MessagesProps> = ({
     if (!myId) return;
     try {
       const data = await fetchMessages();
-      const list = Array.isArray(data) ? data : [];
+      const list = (Array.isArray(data) ? data : []) as MessageRow[];
       setMessages(list);
       const otherIds = new Set<string>();
-      list.forEach((m: any) => {
+      list.forEach((m) => {
         if (m.sender_id !== myId) otherIds.add(m.sender_id);
         if (m.receiver_id !== myId) otherIds.add(m.receiver_id);
       });
@@ -181,7 +184,7 @@ export const Messages: React.FC<MessagesProps> = ({
         const users = await fetchUsersByIds(ids).catch(() => []);
         setUsersMap((prev) => {
           const map = { ...prev };
-          (Array.isArray(users) ? users : []).forEach((u: any) => {
+          (Array.isArray(users) ? users : []).forEach((u: UserMapEntry) => {
             if (u?.id) map[String(u.id)] = u;
           });
           return map;
@@ -197,15 +200,24 @@ export const Messages: React.FC<MessagesProps> = ({
 
   const conversations = useMemo(() => {
     if (!myId) return [];
-    const byOther: Record<string, { last: any; unread: number }> = {};
-    messages.forEach((m: any) => {
+    const byOther: Record<string, { last: MessageRow; unread: number }> = {};
+    messages.forEach((m) => {
       const other = m.sender_id === myId ? m.receiver_id : m.sender_id;
       if (!byOther[other]) byOther[other] = { last: m, unread: 0 };
       if (m.receiver_id === myId && !m.is_read) byOther[other].unread++;
       if (new Date(msgTs(m)) > new Date(msgTs(byOther[other].last))) byOther[other].last = m;
     });
     if (appUser?.role === 'athlete' && coachId && !byOther[coachId]) {
-      byOther[coachId] = { last: { content: '', created_at: '9999-12-31T23:59:59Z', sender_id: coachId, receiver_id: myId }, unread: 0 };
+      byOther[coachId] = {
+        last: {
+          id: 'stub-coach',
+          content: '',
+          created_at: '9999-12-31T23:59:59Z',
+          sender_id: coachId,
+          receiver_id: myId,
+        },
+        unread: 0,
+      };
     }
     return Object.entries(byOther)
       .map(([otherId, { last, unread }]) => ({
@@ -230,6 +242,7 @@ export const Messages: React.FC<MessagesProps> = ({
       return {
         otherId: id,
         last: {
+          id: `stub-${id}`,
           content: '',
           created_at: '1970-01-01T00:00:00.000Z',
           sender_id: myId,
@@ -255,8 +268,12 @@ export const Messages: React.FC<MessagesProps> = ({
   const threadMessages = useMemo(() => {
     if (!myId || !selectedOtherId) return [];
     return messages
-      .filter((m: any) => (m.sender_id === myId && m.receiver_id === selectedOtherId) || (m.sender_id === selectedOtherId && m.receiver_id === myId))
-      .sort((a: any, b: any) => new Date(msgTs(a)).getTime() - new Date(msgTs(b)).getTime());
+      .filter(
+        (m) =>
+          (m.sender_id === myId && m.receiver_id === selectedOtherId) ||
+          (m.sender_id === selectedOtherId && m.receiver_id === myId)
+      )
+      .sort((a, b) => new Date(msgTs(a)).getTime() - new Date(msgTs(b)).getTime());
   }, [messages, myId, selectedOtherId]);
 
   useEffect(() => {
@@ -293,7 +310,9 @@ export const Messages: React.FC<MessagesProps> = ({
 
   const openConversation = (otherId: string) => {
     setSelectedOtherId(otherId);
-    const toMark = messages.filter((m: any) => m.receiver_id === myId && m.sender_id === otherId && !m.is_read).map((m: any) => m.id);
+    const toMark = messages
+      .filter((m) => m.receiver_id === myId && m.sender_id === otherId && !m.is_read)
+      .map((m) => m.id);
     if (toMark.length > 0) markMessagesAsRead(toMark).then(() => loadMessages());
   };
 
@@ -519,7 +538,7 @@ export const Messages: React.FC<MessagesProps> = ({
                         {group.dateLabel}
                       </span>
                     </div>
-                    {group.messages.map((m: any) => {
+                    {group.messages.map((m) => {
                       const isMe = m.sender_id === myId;
                       return (
                         <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>

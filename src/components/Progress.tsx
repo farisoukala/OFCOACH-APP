@@ -17,28 +17,43 @@ import {
   AreaChart,
   Area,
 } from 'recharts';
-import { fetchBodyMeasurementSnapshots, fetchProgressLogs, createProgressLog, updateProgressLog, deleteProgressLog } from '../services/api';
+import {
+  fetchBodyMeasurementSnapshots,
+  fetchProgressLogs,
+  createProgressLog,
+  updateProgressLog,
+  deleteProgressLog,
+  type ProgressLogRow,
+  type BodyMeasurementSnapshot,
+} from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { toast } from '../lib/toast';
 
+const PROGRESS_METRICS = [
+  'tour_ventre_cm',
+  'tour_hanche_cm',
+  'tour_poitrine_cm',
+  'tour_bras_cm',
+  'tour_epaule_cm',
+  'tour_mollet_cm',
+  'taille_cm',
+] as const;
+type ProgressMetricKey = (typeof PROGRESS_METRICS)[number];
+
+function isProgressMetricKey(s: string): s is ProgressMetricKey {
+  return (PROGRESS_METRICS as readonly string[]).includes(s);
+}
+
 export const Progress: React.FC = () => {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [measurementLogs, setMeasurementLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<ProgressLogRow[]>([]);
+  const [measurementLogs, setMeasurementLogs] = useState<BodyMeasurementSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ date: '', weight: '', body_fat: '', notes: '' });
   const [mode, setMode] = useState<'poids' | 'mensurations'>('poids');
-  const [metric, setMetric] = useState<
-    | 'taille_cm'
-    | 'tour_poitrine_cm'
-    | 'tour_ventre_cm'
-    | 'tour_hanche_cm'
-    | 'tour_bras_cm'
-    | 'tour_epaule_cm'
-    | 'tour_mollet_cm'
-  >('tour_ventre_cm');
+  const [metric, setMetric] = useState<ProgressMetricKey>('tour_ventre_cm');
   const { appUser } = useAuth();
   const athleteId = appUser?.id;
 
@@ -87,7 +102,7 @@ export const Progress: React.FC = () => {
     setShowModal(true);
   };
 
-  const openEdit = (log: any) => {
+  const openEdit = (log: ProgressLogRow) => {
     setEditingId(log.id);
     setForm({
       date: log.date || '',
@@ -124,9 +139,10 @@ export const Progress: React.FC = () => {
       }
       await loadLogs();
       setShowModal(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      const msg = err?.message || err?.error_description || 'Erreur lors de l\'enregistrement.';
+      const o = err && typeof err === 'object' ? (err as Record<string, unknown>) : {};
+      const msg = String(o.message ?? o.error_description ?? 'Erreur lors de l\'enregistrement.');
       toast.error('Enregistrement impossible', msg);
     } finally {
       setSaving(false);
@@ -248,7 +264,10 @@ export const Progress: React.FC = () => {
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Mesure</label>
               <select
                 value={metric}
-                onChange={(e) => setMetric(e.target.value as any)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (isProgressMetricKey(v)) setMetric(v);
+                }}
                 className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary text-sm font-semibold"
               >
                 <option value="tour_ventre_cm">Tour de ventre</option>

@@ -28,9 +28,24 @@ interface ProfileProps {
   onNavigateToNotifications?: () => void;
 }
 
+type ProfileData = {
+  name?: string | null;
+  avatar?: string | null;
+  weight_kg?: number | null;
+  height_cm?: number | null;
+  age?: number | null;
+  taille_cm?: number | null;
+  tour_poitrine_cm?: number | null;
+  tour_ventre_cm?: number | null;
+  tour_hanche_cm?: number | null;
+  tour_bras_cm?: number | null;
+  tour_epaule_cm?: number | null;
+  tour_mollet_cm?: number | null;
+};
+
 export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotifications }) => {
   const { appUser, signOut, refreshProfile, updatePassword } = useAuth();
-  const [profile, setProfile] = useState<{ weight_kg?: number | null; height_cm?: number | null; age?: number | null } | null>(null);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState('');
@@ -85,7 +100,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
         name: editName.trim() || null,
         avatar: editAvatar.trim() || null,
       });
-      setProfile((p) => ({ ...p, name: editName.trim(), avatar: editAvatar.trim() }));
+      setProfile((p) => (p ? { ...p, name: editName.trim(), avatar: editAvatar.trim() } : p));
       setShowEditModal(false);
       await refreshProfile();
     } catch (e) {
@@ -115,14 +130,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
       // Historiser un relevé daté (sert aux courbes de progrès en cm)
       await upsertBodyMeasurementSnapshot(appUser.id, { snapshot_date: measurementDate, ...payload });
 
-      setProfile((p) =>
-        p
-          ? ({
-              ...p,
-              ...payload,
-            } as any)
-          : p
-      );
+      setProfile((p) => (p ? { ...p, ...payload } : p));
       await refreshProfile();
     } catch (e) {
       console.error(e);

@@ -23,8 +23,10 @@ import {
   deleteExercise,
   countUnreadNotifications,
   countUnreadMessagesForUser,
+  type NutritionPlanRow,
+  type AthleteAppointmentRow,
 } from '../services/api';
-import { pickFeaturedWorkout, localTodayIso } from '../lib/workoutPlanning';
+import { pickFeaturedWorkout, localTodayIso, type WorkoutSchedulePick, type WorkoutExerciseRow } from '../lib/workoutPlanning';
 import { useAthleteReminders } from '../hooks/useAthleteReminders';
 
 const Progress = lazy(() => import('./Progress').then((m) => ({ default: m.Progress })));
@@ -56,11 +58,11 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
   onNavigateToCalendar,
 }) => {
   const [activeTab, setActiveTab] = useState<Tab>('accueil');
-  const [workouts, setWorkouts] = useState<any[]>([]);
-  const [nutrition, setNutrition] = useState<any>(null);
-  const [coachAppointments, setCoachAppointments] = useState<any[]>([]);
+  const [workouts, setWorkouts] = useState<WorkoutSchedulePick[]>([]);
+  const [nutrition, setNutrition] = useState<NutritionPlanRow | null>(null);
+  const [coachAppointments, setCoachAppointments] = useState<AthleteAppointmentRow[]>([]);
   const [coachingObjective, setCoachingObjective] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [logbookRows, setLogbookRows] = useState<LogbookRow[]>([]);
   const [logbookSavingId, setLogbookSavingId] = useState<string | null>(null);
   const [logbookDeletingId, setLogbookDeletingId] = useState<string | null>(null);
@@ -82,7 +84,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
         const [workoutsData, nutritionData, appts, userRow] = await Promise.all([
           fetchWorkoutsByAthlete(athleteId),
           fetchNutritionPlan(athleteId),
-          fetchAthleteAppointments(athleteId).catch(() => [] as any[]),
+          fetchAthleteAppointments(athleteId).catch(() => [] as AthleteAppointmentRow[]),
           fetchClientById(athleteId).catch(() => null),
         ]);
         setWorkouts(workoutsData);
@@ -149,7 +151,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
       return;
     }
     setLogbookRows(
-      ex.map((e: any) => ({
+      ex.map((e: WorkoutExerciseRow) => ({
         id: String(e.id),
         name: String(e.name ?? ''),
         sets: e.sets != null && e.sets !== '' ? e.sets : '',
@@ -158,7 +160,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
         rest_time: String(e.rest_time ?? ''),
       }))
     );
-  }, [workouts, logbookWorkout?.id]);
+  }, [logbookWorkout?.id, logbookWorkout?.exercises]);
 
   const saveLogbookRow = async (row: LogbookRow) => {
     if (!row.id) return;

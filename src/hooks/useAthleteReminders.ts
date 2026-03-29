@@ -52,13 +52,7 @@ export function useAthleteReminders(opts: {
         showBrowserNotification('OfCoach — Séance du jour', { body: opts.todayWorkoutTitle });
       }
     }
-  }, [
-    opts.enabled,
-    opts.nextAppt?.id,
-    opts.nextAppt?.starts_at,
-    opts.nextAppt?.title,
-    opts.todayWorkoutTitle,
-  ]);
+  }, [opts.enabled, opts.nextAppt, opts.todayWorkoutTitle]);
 
   useEffect(() => {
     if (!opts.enabled) return;
