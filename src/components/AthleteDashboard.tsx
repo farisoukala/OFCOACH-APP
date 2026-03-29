@@ -21,6 +21,8 @@ import {
   updateExercise,
   insertExerciseForWorkout,
   deleteExercise,
+  countUnreadNotifications,
+  countUnreadMessagesForUser,
 } from '../services/api';
 import { pickFeaturedWorkout, localTodayIso } from '../lib/workoutPlanning';
 
@@ -62,6 +64,8 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
   const [logbookSavingId, setLogbookSavingId] = useState<string | null>(null);
   const [logbookDeletingId, setLogbookDeletingId] = useState<string | null>(null);
   const [logbookError, setLogbookError] = useState<string | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const { appUser, signOut } = useAuth();
   const athleteId = appUser?.id;
   const athleteName = appUser?.name ?? 'Athlète';
@@ -93,6 +97,32 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
     };
     loadData();
   }, [athleteId]);
+
+  const refreshBadgeCounts = useCallback(async () => {
+    if (!athleteId) return;
+    try {
+      const [n, m] = await Promise.all([
+        countUnreadNotifications(athleteId).catch(() => 0),
+        countUnreadMessagesForUser(athleteId).catch(() => 0),
+      ]);
+      setUnreadNotifications(n);
+      setUnreadMessages(m);
+    } catch {
+      setUnreadNotifications(0);
+      setUnreadMessages(0);
+    }
+  }, [athleteId]);
+
+  useEffect(() => {
+    void refreshBadgeCounts();
+    const id = window.setInterval(() => void refreshBadgeCounts(), 60000);
+    const onFocus = () => void refreshBadgeCounts();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refreshBadgeCounts]);
 
   const reloadWorkouts = useCallback(async () => {
     if (!athleteId) return;
@@ -667,13 +697,18 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
             <TrendingUp size={24} />
             <span className="text-[10px] font-medium">Progrès</span>
           </button>
-          <button 
+          <button
+            type="button"
             onClick={() => onNavigateToMessages()}
             className="flex flex-col items-center gap-1 text-slate-400 hover:text-primary transition-colors relative"
           >
             <MessageCircle size={24} />
             <span className="text-[10px] font-medium">Messagerie</span>
-            <span className="absolute -top-1 right-2 size-2 bg-red-500 rounded-full border-2 border-background-dark"></span>
+            {unreadMessages > 0 && (
+              <span className="absolute top-0 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-red-500 text-white text-[9px] font-bold rounded-full ring-2 ring-background-light dark:ring-background-dark">
+                {unreadMessages > 99 ? '99+' : unreadMessages}
+              </span>
+            )}
           </button>
           <button 
             onClick={() => setActiveTab('profile')}

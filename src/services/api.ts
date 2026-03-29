@@ -574,6 +574,20 @@ export async function fetchNotifications(userId: string) {
   return data || [];
 }
 
+/** Compte les notifications non lues (is_read faux ou absent), aligné sur l’écran Notifications. */
+export async function countUnreadNotifications(userId: string): Promise<number> {
+  const { data, error } = await supabase.from('notifications').select('is_read').eq('user_id', userId);
+  if (error) throw error;
+  return (data || []).filter((row: { is_read?: boolean | null }) => !row.is_read).length;
+}
+
+/** Messages reçus non lus (is_read faux ou absent), comme dans l’écran Messages. */
+export async function countUnreadMessagesForUser(userId: string): Promise<number> {
+  const { data, error } = await supabase.from('messages').select('is_read').eq('receiver_id', userId);
+  if (error) throw error;
+  return (data || []).filter((row: { is_read?: boolean | null }) => !row.is_read).length;
+}
+
 export async function markNotificationRead(notificationId: string) {
   const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', notificationId);
   if (error) throw error;
