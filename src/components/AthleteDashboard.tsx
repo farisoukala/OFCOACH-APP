@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, lazy, Suspense } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense, useCallback } from 'react';
 import { 
   Bell, 
   Home,
@@ -10,8 +10,16 @@ import {
   Target,
   LogOut,
   Calendar,
+  Plus,
 } from 'lucide-react';
-import { fetchWorkoutsByAthlete, fetchNutritionPlan, fetchAthleteAppointments, fetchClientById } from '../services/api';
+import {
+  fetchWorkoutsByAthlete,
+  fetchNutritionPlan,
+  fetchAthleteAppointments,
+  fetchClientById,
+  updateExercise,
+  insertExerciseForWorkout,
+} from '../services/api';
 import { pickFeaturedWorkout, localTodayIso } from '../lib/workoutPlanning';
 
 const Progress = lazy(() => import('./Progress').then((m) => ({ default: m.Progress })));
@@ -21,6 +29,15 @@ const Profile = lazy(() => import('./Profile').then((m) => ({ default: m.Profile
 import { useAuth } from '../context/AuthContext';
 
 type Tab = 'accueil' | 'workout' | 'nutrition' | 'progress' | 'profile';
+
+type LogbookRow = {
+  id: string;
+  name: string;
+  sets: string | number;
+  reps: string;
+  weight: string | number;
+  rest_time: string;
+};
 
 interface AthleteDashboardProps {
   onNavigateToMessages: () => void;
@@ -39,6 +56,9 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
   const [coachAppointments, setCoachAppointments] = useState<any[]>([]);
   const [coachingObjective, setCoachingObjective] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [logbookRows, setLogbookRows] = useState<LogbookRow[]>([]);
+  const [logbookSavingId, setLogbookSavingId] = useState<string | null>(null);
+  const [logbookError, setLogbookError] = useState<string | null>(null);
   const { appUser, signOut } = useAuth();
   const athleteId = appUser?.id;
   const athleteName = appUser?.name ?? 'Athlète';
@@ -71,6 +91,90 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
     loadData();
   }, [athleteId]);
 
+  const reloadWorkouts = useCallback(async () => {
+    if (!athleteId) return;
+    const data = await fetchWorkoutsByAthlete(athleteId);
+    setWorkouts(data);
+  }, [athleteId]);
+
+  const featuredWorkout = pickFeaturedWorkout(workouts);
+
+  useEffect(() => {
+    if (!featuredWorkout?.id) {
+      setLogbookRows([]);
+      return;
+    }
+    const ex = featuredWorkout.exercises;
+    if (!Array.isArray(ex) || ex.length === 0) {
+      setLogbookRows([]);
+      return;
+    }
+    setLogbookRows(
+      ex.map((e: any) => ({
+        id: String(e.id),
+        name: String(e.name ?? ''),
+        sets: e.sets != null && e.sets !== '' ? e.sets : '',
+        reps: String(e.reps ?? ''),
+        weight: e.weight != null && e.weight !== '' ? e.weight : '',
+        rest_time: String(e.rest_time ?? ''),
+      }))
+    );
+  }, [workouts, featuredWorkout?.id]);
+
+  const saveLogbookRow = async (row: LogbookRow) => {
+    if (!row.id) return;
+    setLogbookSavingId(row.id);
+    setLogbookError(null);
+    try {
+      const setsNum =
+        row.sets === '' || row.sets == null
+          ? null
+          : Math.max(0, parseInt(String(row.sets), 10));
+      const weightNum =
+        row.weight === '' || row.weight == null || String(row.weight).trim() === ''
+          ? null
+          : parseFloat(String(row.weight).replace(',', '.'));
+      await updateExercise(row.id, {
+        name: String(row.name ?? '').trim() || 'Exercice',
+        sets: setsNum === null || Number.isNaN(setsNum) ? null : setsNum,
+        reps: String(row.reps ?? '').trim() || null,
+        weight: weightNum === null || Number.isNaN(weightNum) ? null : weightNum,
+        rest_time: String(row.rest_time ?? '').trim() || null,
+      });
+      await reloadWorkouts();
+    } catch (e) {
+      console.error(e);
+      setLogbookError(
+        "Impossible d’enregistrer. Ré-exécute sur Supabase supabase_migration_exercises_athlete_update.sql (droits athlète sur exercises)."
+      );
+    } finally {
+      setLogbookSavingId(null);
+    }
+  };
+
+  const updateLogbookField = (id: string, field: keyof LogbookRow, value: string | number) => {
+    setLogbookRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  };
+
+  const LOG_ADD = '__add_exercise__';
+
+  const handleAddLogbookExercise = async () => {
+    if (!featuredWorkout?.id) return;
+    setLogbookSavingId(LOG_ADD);
+    setLogbookError(null);
+    try {
+      await insertExerciseForWorkout(featuredWorkout.id);
+      await reloadWorkouts();
+    } catch (e) {
+      console.error(e);
+      setLogbookError(
+        "Impossible d’ajouter l’exercice. Ré-exécute sur Supabase le script supabase_migration_exercises_athlete_update.sql (bloc INSERT + UPDATE)."
+      );
+    } finally {
+      setLogbookSavingId(null);
+    }
+  };
+
   const prevTabRef = useRef<Tab>(activeTab);
   useEffect(() => {
     const prev = prevTabRef.current;
@@ -84,7 +188,6 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
       .catch(() => {});
   }, [activeTab, athleteId]);
 
-  const featuredWorkout = pickFeaturedWorkout(workouts);
   const todayIso = localTodayIso();
 
   const startOfToday = new Date();
@@ -100,56 +203,180 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
         return (
           <div className="space-y-8">
             <section>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold">Séance du jour</h2>
-                <span className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-lg uppercase tracking-wider">
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Dumbbell className="text-primary shrink-0" size={20} />
+                  Carnet d’entraînement
+                </h2>
+                <span className="text-xs font-semibold px-2 py-1 bg-primary/10 text-primary rounded-lg uppercase tracking-wider shrink-0">
                   {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })}
                 </span>
               </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Ajoute des exercices, puis modifie séries, charges, répétitions et repos ; enregistre chaque ligne avec le bouton sous la carte.
+              </p>
+
               {featuredWorkout ? (
-                <div className="relative overflow-hidden rounded-2xl group shadow-2xl">
-                  <div className="absolute inset-0 bg-gradient-to-t from-background-dark via-background-dark/40 to-transparent z-10"></div>
-                  <img 
-                    src="https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=800&auto=format&fit=crop" 
-                    className="w-full aspect-[16/9] object-cover group-hover:scale-105 transition-transform duration-500" 
-                    alt="Workout"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Dumbbell className="text-primary" size={14} />
-                      <p className="text-primary text-sm font-bold uppercase tracking-widest">Force & Puissance</p>
-                    </div>
-                    <h3 className="text-2xl font-extrabold text-white mb-1">{featuredWorkout.title}</h3>
-                    <p className="text-slate-300 text-sm mb-1">
-                      {featuredWorkout.exercises?.length || 0} exercices
-                      {featuredWorkout.date && (
-                        <>
-                          {' '}
-                          ·{' '}
-                          {String(featuredWorkout.date) === todayIso
-                            ? "Prévue aujourd'hui"
-                            : new Date(featuredWorkout.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">{featuredWorkout.title}</h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {featuredWorkout.date
+                          ? String(featuredWorkout.date) === todayIso
+                            ? "Séance prévue aujourd’hui"
+                            : new Date(String(featuredWorkout.date) + 'T12:00:00').toLocaleDateString('fr-FR', {
                                 weekday: 'long',
                                 day: 'numeric',
                                 month: 'short',
-                              })}
-                        </>
-                      )}
-                    </p>
-                    <p className="text-slate-400 text-xs mb-4">Voir l’onglet Entraînement pour le planning de la semaine.</p>
-                    <button 
-                      onClick={() => setActiveTab('workout')}
-                      className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <TrendingUp size={20} />
-                      Démarrer la séance
-                    </button>
+                              })
+                          : 'Date à définir'}
+                        {logbookRows.length ? ` · ${logbookRows.length} exercice${logbookRows.length > 1 ? 's' : ''}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={handleAddLogbookExercise}
+                        disabled={logbookSavingId !== null}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold bg-primary text-white px-3 py-2 rounded-xl disabled:opacity-50 active:scale-[0.98]"
+                      >
+                        <Plus size={16} />
+                        {logbookSavingId === LOG_ADD ? 'Ajout…' : 'Ajouter un exercice'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('workout')}
+                        className="text-xs font-bold text-primary hover:underline whitespace-nowrap"
+                      >
+                        Planning complet
+                      </button>
+                    </div>
                   </div>
+
+                  {logbookError && (
+                    <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-500/10 rounded-xl px-3 py-2">{logbookError}</p>
+                  )}
+
+                  {logbookRows.length === 0 ? (
+                    <div className="bg-slate-100 dark:bg-slate-900 p-6 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 text-center space-y-3">
+                      <p className="text-slate-500 text-sm">Aucun exercice dans cette séance pour l’instant.</p>
+                      <button
+                        type="button"
+                        onClick={handleAddLogbookExercise}
+                        disabled={logbookSavingId !== null}
+                        className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50"
+                      >
+                        <Plus size={18} />
+                        {logbookSavingId === LOG_ADD ? 'Ajout…' : 'Ajouter un exercice'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('workout')}
+                        className="text-primary text-sm font-bold hover:underline block w-full"
+                      >
+                        Voir l’onglet Entraînement
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {logbookRows.map((row, idx) => (
+                        <div
+                          key={row.id}
+                          className="bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-3">
+                            <span className="text-xs font-bold text-primary uppercase tracking-wider">Ex. {idx + 1}</span>
+                            {logbookSavingId === row.id && (
+                              <span className="text-[10px] font-semibold text-slate-500">Enregistrement…</span>
+                            )}
+                          </div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nom</label>
+                          <input
+                            type="text"
+                            value={row.name}
+                            onChange={(e) => updateLogbookField(row.id, 'name', e.target.value)}
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm font-semibold mb-3 outline-none focus:ring-2 focus:ring-primary"
+                            placeholder="Ex. Squat"
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Séries</label>
+                              <input
+                                type="number"
+                                min={0}
+                                inputMode="numeric"
+                                value={row.sets === '' ? '' : row.sets}
+                                onChange={(e) => updateLogbookField(row.id, 'sets', e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                placeholder="4"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Charge (kg)</label>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={row.weight === '' ? '' : row.weight}
+                                onChange={(e) => updateLogbookField(row.id, 'weight', e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                placeholder="60"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Répétitions</label>
+                              <input
+                                type="text"
+                                value={row.reps}
+                                onChange={(e) => updateLogbookField(row.id, 'reps', e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                placeholder="10 ou 8-10"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Repos</label>
+                              <input
+                                type="text"
+                                value={row.rest_time}
+                                onChange={(e) => updateLogbookField(row.id, 'rest_time', e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary"
+                                placeholder="90s"
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={logbookSavingId === row.id || logbookSavingId === LOG_ADD}
+                            onClick={() => saveLogbookRow(row)}
+                            className="mt-4 w-full py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50 active:scale-[0.99] transition-transform"
+                          >
+                            Enregistrer cet exercice
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={handleAddLogbookExercise}
+                        disabled={logbookSavingId !== null}
+                        className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 text-sm font-bold inline-flex items-center justify-center gap-2 hover:border-primary/50 hover:text-primary disabled:opacity-50 transition-colors"
+                      >
+                        <Plus size={18} />
+                        {logbookSavingId === LOG_ADD ? 'Ajout…' : 'Ajouter un exercice'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="bg-slate-100 dark:bg-slate-900 p-10 rounded-2xl text-center border-2 border-dashed border-slate-200 dark:border-slate-800">
-                  <p className="text-slate-500">Repos aujourd'hui ! 🧘‍♂️</p>
+                <div className="bg-slate-100 dark:bg-slate-900 p-8 rounded-2xl text-center border-2 border-dashed border-slate-200 dark:border-slate-800">
+                  <p className="text-slate-600 dark:text-slate-400 text-sm mb-3">Aucune séance à afficher pour le moment.</p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('workout')}
+                    className="text-primary font-bold text-sm hover:underline inline-flex items-center gap-1"
+                  >
+                    <TrendingUp size={16} />
+                    Ouvrir Entraînement
+                  </button>
                 </div>
               )}
             </section>

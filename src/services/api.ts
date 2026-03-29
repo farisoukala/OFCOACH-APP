@@ -205,6 +205,53 @@ export async function createWorkout(workoutData: any) {
   return workoutResult;
 }
 
+/** Mise à jour d’un exercice (carnet athlète : séries, charge, reps, repos). Nécessite RLS athlète sur exercises (voir supabase_migration_exercises_athlete_update.sql). */
+export async function updateExercise(
+  exerciseId: string,
+  patch: {
+    name?: string;
+    sets?: number | null;
+    reps?: string | null;
+    weight?: number | null;
+    rest_time?: string | null;
+  }
+) {
+  const payload: Record<string, unknown> = {};
+  if (patch.name !== undefined) payload.name = patch.name;
+  if (patch.sets !== undefined) payload.sets = patch.sets;
+  if (patch.reps !== undefined) payload.reps = patch.reps;
+  if (patch.weight !== undefined) payload.weight = patch.weight;
+  if (patch.rest_time !== undefined) payload.rest_time = patch.rest_time;
+
+  const { error } = await supabase.from('exercises').update(payload).eq('id', exerciseId);
+  if (error) throw error;
+}
+
+/** Ajoute un exercice à une séance (accueil athlète). Nécessite RLS INSERT athlète (voir supabase_migration_exercises_athlete_update.sql). */
+export async function insertExerciseForWorkout(
+  workoutId: string,
+  row?: {
+    name?: string;
+    sets?: number | null;
+    reps?: string | null;
+    weight?: number | null;
+    rest_time?: string | null;
+  }
+) {
+  const { error } = await supabase.from('exercises').insert([
+    {
+      id: crypto.randomUUID(),
+      workout_id: workoutId,
+      name: (row?.name && String(row.name).trim()) || 'Nouvel exercice',
+      sets: row?.sets ?? null,
+      reps: row?.reps ?? null,
+      weight: row?.weight ?? null,
+      rest_time: row?.rest_time ?? null,
+    },
+  ]);
+  if (error) throw error;
+}
+
 export async function fetchNutritionPlan(athleteId: string) {
   const { data, error } = await supabase
     .from('nutrition_plans')

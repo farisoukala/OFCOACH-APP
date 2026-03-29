@@ -86,6 +86,7 @@ Exécuter les scripts dans l’ordre suivant via **SQL Editor** (Nouvelle requê
 | 4 | `supabase_migration_progress_logs.sql` | Table `progress_logs` si absente + RLS (optionnel si déjà dans le schéma) |
 | 5 | `supabase_migration_progress_logs_add_body_fat.sql` | Colonnes `body_fat` et `notes` sur `progress_logs` |
 | 6 | `supabase_migration_workout_athlete_update.sql` | RLS : athlète peut mettre à jour sa séance (ex. marquer terminée) |
+| — | `supabase_migration_exercises_athlete_update.sql` | RLS : athlète peut **ajouter / modifier** les exercices de ses séances (carnet d’entraînement sur l’accueil) |
 | 7 | `supabase_migration_notifications.sql` | Table **notifications** + RLS (pour l’écran Notifications) |
 | 8 | `supabase_migration_user_gender.sql` | Colonne **gender** sur `users` (inscription Homme/Femme + biométrie) |
 | 9 | `supabase_migration_athlete_appointments.sql` | Table **athlete_appointments** (jour + heure des RDV coach) + RLS ; puis ré-exécuter les blocs RLS de `supabase_rls_safe.sql` pour cette table **ou** n’exécuter que le bloc `ATHLETE_APPOINTMENTS` ajouté en fin de `supabase_rls_safe.sql` |
