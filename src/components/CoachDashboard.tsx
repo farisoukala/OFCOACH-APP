@@ -1,12 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Users, 
-  RefreshCw, 
-  Target, 
   Search, 
   ChevronRight,
   TrendingUp,
-  CheckCircle,
   Grid,
   MessageSquare,
   Calendar,
@@ -97,7 +94,7 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="mb-6 max-w-sm">
           <div className="bg-white dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
             <div>
               <Users className="text-primary mb-2" size={24} />
@@ -108,32 +105,6 @@ export const CoachDashboard: React.FC<CoachDashboardProps> = ({
               <span className="text-emerald-500 text-sm font-semibold flex items-center bg-emerald-500/10 px-2 py-0.5 rounded-full">
                 <TrendingUp size={14} className="mr-1" />+5%
               </span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
-            <div>
-              <RefreshCw className="text-primary mb-2" size={24} />
-              <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Mises à jour (24h)</p>
-            </div>
-            <div className="flex items-end justify-between mt-2">
-              <h3 className="text-3xl font-bold">12</h3>
-              <span className="text-emerald-500 text-sm font-semibold flex items-center bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                <CheckCircle size={14} className="mr-1" />Active
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-700/50 shadow-sm flex flex-col justify-between">
-            <div>
-              <Target className="text-primary mb-2" size={24} />
-              <p className="text-slate-500 dark:text-slate-400 text-xs font-medium uppercase tracking-wider">Objectifs atteints</p>
-            </div>
-            <div className="flex items-end justify-between mt-2">
-              <h3 className="text-3xl font-bold">85%</h3>
-              <div className="w-16 bg-slate-200 dark:bg-slate-700 rounded-full h-2 mb-2 relative overflow-hidden">
-                <div className="absolute left-0 top-0 h-full bg-primary rounded-full" style={{ width: '85%' }}></div>
-              </div>
             </div>
           </div>
         </div>
