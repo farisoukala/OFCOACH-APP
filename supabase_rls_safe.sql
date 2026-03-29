@@ -70,7 +70,12 @@ BEGIN
       );
     DROP POLICY IF EXISTS "Exercises delete via workout" ON public.exercises;
     CREATE POLICY "Exercises delete via workout" ON public.exercises FOR DELETE TO authenticated
-      USING (workout_id IN (SELECT id FROM public.workouts WHERE (coach_id::uuid) = auth.uid()));
+      USING (
+        workout_id IN (
+          SELECT id FROM public.workouts
+          WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()
+        )
+      );
   END IF;
 END $$;
 

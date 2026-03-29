@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, lazy, Suspense, useCallback } from 'react';
+import React, { useEffect, useState, useRef, lazy, Suspense, useCallback, useMemo } from 'react';
 import { 
   Bell, 
   Home,
@@ -11,6 +11,7 @@ import {
   LogOut,
   Calendar,
   Plus,
+  Trash2,
 } from 'lucide-react';
 import {
   fetchWorkoutsByAthlete,
@@ -19,6 +20,7 @@ import {
   fetchClientById,
   updateExercise,
   insertExerciseForWorkout,
+  deleteExercise,
 } from '../services/api';
 import { pickFeaturedWorkout, localTodayIso } from '../lib/workoutPlanning';
 
@@ -58,6 +60,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [logbookRows, setLogbookRows] = useState<LogbookRow[]>([]);
   const [logbookSavingId, setLogbookSavingId] = useState<string | null>(null);
+  const [logbookDeletingId, setLogbookDeletingId] = useState<string | null>(null);
   const [logbookError, setLogbookError] = useState<string | null>(null);
   const { appUser, signOut } = useAuth();
   const athleteId = appUser?.id;
@@ -97,14 +100,19 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
     setWorkouts(data);
   }, [athleteId]);
 
-  const featuredWorkout = pickFeaturedWorkout(workouts);
+  const logbookWorkout = useMemo(() => {
+    const f = pickFeaturedWorkout(workouts);
+    if (f) return f;
+    if (Array.isArray(workouts) && workouts.length > 0) return workouts[0];
+    return null;
+  }, [workouts]);
 
   useEffect(() => {
-    if (!featuredWorkout?.id) {
+    if (!logbookWorkout?.id) {
       setLogbookRows([]);
       return;
     }
-    const ex = featuredWorkout.exercises;
+    const ex = logbookWorkout.exercises;
     if (!Array.isArray(ex) || ex.length === 0) {
       setLogbookRows([]);
       return;
@@ -119,7 +127,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
         rest_time: String(e.rest_time ?? ''),
       }))
     );
-  }, [workouts, featuredWorkout?.id]);
+  }, [workouts, logbookWorkout?.id]);
 
   const saveLogbookRow = async (row: LogbookRow) => {
     if (!row.id) return;
@@ -144,8 +152,16 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
       await reloadWorkouts();
     } catch (e) {
       console.error(e);
+      const detail =
+        e && typeof e === 'object' && 'message' in e && typeof (e as { message: string }).message === 'string'
+          ? (e as { message: string }).message
+          : e instanceof Error
+            ? e.message
+            : '';
       setLogbookError(
-        "Impossible d’enregistrer. Ré-exécute sur Supabase supabase_migration_exercises_athlete_update.sql (droits athlète sur exercises)."
+        detail
+          ? `Impossible d’enregistrer : ${detail}. Si c’est un refus d’accès, ré-exécute supabase_migration_exercises_athlete_update.sql sur Supabase.`
+          : 'Impossible d’enregistrer. Ré-exécute sur Supabase supabase_migration_exercises_athlete_update.sql (droits athlète sur exercises).'
       );
     } finally {
       setLogbookSavingId(null);
@@ -159,21 +175,61 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
   const LOG_ADD = '__add_exercise__';
 
   const handleAddLogbookExercise = async () => {
-    if (!featuredWorkout?.id) return;
+    if (!logbookWorkout?.id) {
+      setLogbookError(
+        'Aucune séance disponible pour ajouter un exercice. Ouvre l’onglet Entraînement ou demande à ton coach de te créer une séance.'
+      );
+      return;
+    }
     setLogbookSavingId(LOG_ADD);
     setLogbookError(null);
     try {
-      await insertExerciseForWorkout(featuredWorkout.id);
+      await insertExerciseForWorkout(logbookWorkout.id);
       await reloadWorkouts();
     } catch (e) {
       console.error(e);
+      const detail =
+        e && typeof e === 'object' && 'message' in e && typeof (e as { message: string }).message === 'string'
+          ? (e as { message: string }).message
+          : e instanceof Error
+            ? e.message
+            : '';
       setLogbookError(
-        "Impossible d’ajouter l’exercice. Ré-exécute sur Supabase le script supabase_migration_exercises_athlete_update.sql (bloc INSERT + UPDATE)."
+        detail
+          ? `Impossible d’ajouter l’exercice : ${detail}. Si c’est un refus d’accès, ré-exécute supabase_migration_exercises_athlete_update.sql sur Supabase.`
+          : 'Impossible d’ajouter l’exercice. Ré-exécute sur Supabase le script supabase_migration_exercises_athlete_update.sql (INSERT, UPDATE et DELETE).'
       );
     } finally {
       setLogbookSavingId(null);
     }
   };
+
+  const handleDeleteLogbookExercise = async (exerciseId: string) => {
+    if (!window.confirm('Supprimer cet exercice ?')) return;
+    setLogbookDeletingId(exerciseId);
+    setLogbookError(null);
+    try {
+      await deleteExercise(exerciseId);
+      await reloadWorkouts();
+    } catch (e) {
+      console.error(e);
+      const detail =
+        e && typeof e === 'object' && 'message' in e && typeof (e as { message: string }).message === 'string'
+          ? (e as { message: string }).message
+          : e instanceof Error
+            ? e.message
+            : '';
+      setLogbookError(
+        detail
+          ? `Impossible de supprimer : ${detail}. Si c’est un refus d’accès, ré-exécute supabase_migration_exercises_athlete_update.sql sur Supabase (policy DELETE).`
+          : 'Impossible de supprimer. Ré-exécute sur Supabase supabase_migration_exercises_athlete_update.sql (policy DELETE sur exercises).'
+      );
+    } finally {
+      setLogbookDeletingId(null);
+    }
+  };
+
+  const logbookBusy = logbookSavingId !== null || logbookDeletingId !== null;
 
   const prevTabRef = useRef<Tab>(activeTab);
   useEffect(() => {
@@ -295,16 +351,16 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
                 Ajoute des exercices, puis modifie séries, charges, répétitions et repos ; enregistre chaque ligne avec le bouton sous la carte.
               </p>
 
-              {featuredWorkout ? (
+              {logbookWorkout ? (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">{featuredWorkout.title}</h3>
+                      <h3 className="text-base font-extrabold text-slate-900 dark:text-slate-100">{logbookWorkout.title}</h3>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {featuredWorkout.date
-                          ? String(featuredWorkout.date) === todayIso
+                        {logbookWorkout.date
+                          ? String(logbookWorkout.date) === todayIso
                             ? "Séance prévue aujourd’hui"
-                            : new Date(String(featuredWorkout.date) + 'T12:00:00').toLocaleDateString('fr-FR', {
+                            : new Date(String(logbookWorkout.date) + 'T12:00:00').toLocaleDateString('fr-FR', {
                                 weekday: 'long',
                                 day: 'numeric',
                                 month: 'short',
@@ -317,7 +373,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
                       <button
                         type="button"
                         onClick={handleAddLogbookExercise}
-                        disabled={logbookSavingId !== null}
+                        disabled={logbookBusy}
                         className="inline-flex items-center gap-1.5 text-xs font-bold bg-primary text-white px-3 py-2 rounded-xl disabled:opacity-50 active:scale-[0.98]"
                       >
                         <Plus size={16} />
@@ -343,7 +399,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
                       <button
                         type="button"
                         onClick={handleAddLogbookExercise}
-                        disabled={logbookSavingId !== null}
+                        disabled={logbookBusy}
                         className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50"
                       >
                         <Plus size={18} />
@@ -366,9 +422,23 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
                         >
                           <div className="flex items-center justify-between gap-2 mb-3">
                             <span className="text-xs font-bold text-primary uppercase tracking-wider">Ex. {idx + 1}</span>
-                            {logbookSavingId === row.id && (
-                              <span className="text-[10px] font-semibold text-slate-500">Enregistrement…</span>
-                            )}
+                            <div className="flex items-center gap-2 shrink-0">
+                              {logbookSavingId === row.id && (
+                                <span className="text-[10px] font-semibold text-slate-500">Enregistrement…</span>
+                              )}
+                              {logbookDeletingId === row.id && (
+                                <span className="text-[10px] font-semibold text-slate-500">Suppression…</span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteLogbookExercise(row.id)}
+                                disabled={logbookBusy}
+                                className="p-2 rounded-xl text-slate-500 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-40"
+                                aria-label="Supprimer cet exercice"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nom</label>
                           <input
@@ -425,7 +495,9 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
                           </div>
                           <button
                             type="button"
-                            disabled={logbookSavingId === row.id || logbookSavingId === LOG_ADD}
+                            disabled={
+                              logbookBusy || logbookSavingId === row.id || logbookSavingId === LOG_ADD
+                            }
                             onClick={() => saveLogbookRow(row)}
                             className="mt-4 w-full py-2.5 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50 active:scale-[0.99] transition-transform"
                           >
@@ -436,7 +508,7 @@ export const AthleteDashboard: React.FC<AthleteDashboardProps> = ({
                       <button
                         type="button"
                         onClick={handleAddLogbookExercise}
-                        disabled={logbookSavingId !== null}
+                        disabled={logbookBusy}
                         className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 text-sm font-bold inline-flex items-center justify-center gap-2 hover:border-primary/50 hover:text-primary disabled:opacity-50 transition-colors"
                       >
                         <Plus size={18} />

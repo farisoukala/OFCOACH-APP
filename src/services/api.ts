@@ -227,6 +227,12 @@ export async function updateExercise(
   if (error) throw error;
 }
 
+/** Supprime un exercice (carnet accueil). Nécessite RLS DELETE athlète (voir supabase_migration_exercises_athlete_update.sql). */
+export async function deleteExercise(exerciseId: string) {
+  const { error } = await supabase.from('exercises').delete().eq('id', exerciseId);
+  if (error) throw error;
+}
+
 /** Ajoute un exercice à une séance (accueil athlète). Nécessite RLS INSERT athlète (voir supabase_migration_exercises_athlete_update.sql). */
 export async function insertExerciseForWorkout(
   workoutId: string,

@@ -1,6 +1,6 @@
 -- ============================================================
--- OfCoach – L’athlète peut modifier / ajouter des exercices (carnet d’entraînement)
--- Exécuter dans Supabase → SQL Editor si la policy actuelle est « coach only ».
+-- OfCoach – L’athlète peut ajouter / modifier / supprimer des exercices (carnet d’entraînement)
+-- Exécuter dans Supabase → SQL Editor si les policies actuelles sont « coach only ».
 -- ============================================================
 
 DROP POLICY IF EXISTS "Exercises insert via workout" ON public.exercises;
@@ -23,6 +23,16 @@ CREATE POLICY "Exercises update via workout"
     )
   )
   WITH CHECK (
+    workout_id IN (
+      SELECT id FROM public.workouts
+      WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "Exercises delete via workout" ON public.exercises;
+CREATE POLICY "Exercises delete via workout"
+  ON public.exercises FOR DELETE TO authenticated
+  USING (
     workout_id IN (
       SELECT id FROM public.workouts
       WHERE (athlete_id::uuid) = auth.uid() OR (coach_id::uuid) = auth.uid()
