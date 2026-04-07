@@ -2,6 +2,54 @@ import { supabase } from '../lib/supabase';
 import type { WorkoutSchedulePick } from '../lib/workoutPlanning';
 import type { MessageRow, PublicUserRow } from '../types/rows';
 
+const AVATAR_BUCKET = 'avatars';
+const AVATAR_MAX_BYTES = 2.5 * 1024 * 1024;
+const AVATAR_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
+/**
+ * Envoie une image de photothèque vers Supabase Storage (bucket public `avatars`) et retourne l’URL publique.
+ * Prérequis SQL : `supabase_migration_storage_avatars.sql` exécuté sur le projet.
+ * Seul l’utilisateur connecté peut écrire dans le dossier `{son user id}/`.
+ */
+export async function uploadUserAvatarFile(userId: string, file: File): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user?.id || session.user.id !== userId) {
+    throw new Error('Tu dois être connecté pour changer ta photo.');
+  }
+  let mime = (file.type || '').toLowerCase();
+  if (!mime) {
+    const n = file.name.toLowerCase();
+    if (n.endsWith('.jpg') || n.endsWith('.jpeg')) mime = 'image/jpeg';
+    else if (n.endsWith('.png')) mime = 'image/png';
+    else if (n.endsWith('.webp')) mime = 'image/webp';
+  }
+  if (!AVATAR_MIME[mime]) {
+    throw new Error('Format accepté : JPEG, PNG ou WebP.');
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    throw new Error('Image trop lourde (max. 2,5 Mo).');
+  }
+  const ext = AVATAR_MIME[mime];
+  const path = `${userId}/avatar.${ext}`;
+  const { error: upErr } = await supabase.storage.from(AVATAR_BUCKET).upload(path, file, {
+    upsert: true,
+    cacheControl: '3600',
+    contentType: mime,
+  });
+  if (upErr) throw upErr;
+  const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  if (!pub?.publicUrl) throw new Error('URL publique indisponible.');
+  // Évite l’affichage d’une ancienne image mise en cache après remplacement du fichier
+  const sep = pub.publicUrl.includes('?') ? '&' : '?';
+  return `${pub.publicUrl}${sep}v=${Date.now()}`;
+}
+
 /** Liste des athlètes. Si coachId est fourni, ne retourne que les athlètes liés à ce coach. */
 export async function fetchClients(coachId?: string | null): Promise<PublicUserRow[] | null> {
   let q = supabase.from('users').select('*').eq('role', 'athlete');

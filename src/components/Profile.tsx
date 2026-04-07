@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   User,
   Settings,
@@ -10,9 +10,15 @@ import {
   ArrowLeft,
   X,
   Lock,
+  ImageUp,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { fetchClientById, updateUserProfile, upsertBodyMeasurementSnapshot } from '../services/api';
+import {
+  fetchClientById,
+  updateUserProfile,
+  upsertBodyMeasurementSnapshot,
+  uploadUserAvatarFile,
+} from '../services/api';
 import { PasswordStrengthIndicator } from './PasswordStrengthIndicator';
 import { validatePassword, validatePasswordMatch, validateRequired } from '../utils/validation';
 import { toast } from '../lib/toast';
@@ -59,6 +65,8 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordFieldErrors, setPasswordFieldErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
   const [browserNotifyPerm, setBrowserNotifyPerm] = useState(() => getBrowserNotificationSupport());
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarFileRef = useRef<HTMLInputElement>(null);
 
   const [tailleCm, setTailleCm] = useState<string>('');
   const [tourPoitrineCm, setTourPoitrineCm] = useState<string>('');
@@ -144,6 +152,30 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
     signOut();
   };
 
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !appUser?.id) return;
+    setUploadingAvatar(true);
+    try {
+      const url = await uploadUserAvatarFile(appUser.id, file);
+      await updateUserProfile(appUser.id, { avatar: url });
+      setProfile((p) => (p ? { ...p, avatar: url } : p));
+      setEditAvatar(url);
+      await refreshProfile();
+      toast.success('Photo de profil mise à jour');
+    } catch (err) {
+      console.error(err);
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: string }).message)
+          : 'Vérifie le format (JPEG, PNG, WebP, max 2,5 Mo) et exécute supabase_migration_storage_avatars.sql sur Supabase si besoin.';
+      toast.error('Envoi de la photo impossible', msg);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const openPasswordModal = () => {
     setCurrentPassword('');
     setNewPassword('');
@@ -206,6 +238,14 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
       )}
 
       <div className="flex flex-col items-center pt-4">
+        <input
+          ref={avatarFileRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          className="sr-only"
+          aria-hidden
+          onChange={(ev) => void handleAvatarFileChange(ev)}
+        />
         <div className="relative">
           <div className="w-28 h-28 rounded-3xl overflow-hidden border-4 border-primary/20">
             <img
@@ -216,14 +256,17 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
             />
           </div>
           <button
-            onClick={() => {
-              setEditName(displayName);
-              setEditAvatar(displayAvatar || '');
-              setShowEditModal(true);
-            }}
-            className="absolute -bottom-2 -right-2 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg border-4 border-background-light dark:border-background-dark"
+            type="button"
+            disabled={uploadingAvatar}
+            onClick={() => avatarFileRef.current?.click()}
+            title="Choisir une photo dans la photothèque"
+            className="absolute -bottom-2 -right-2 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg border-4 border-background-light dark:border-background-dark disabled:opacity-60"
           >
-            <Camera size={18} />
+            {uploadingAvatar ? (
+              <span className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Camera size={18} />
+            )}
           </button>
         </div>
         <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">{displayName}</h2>
@@ -493,7 +536,26 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Photo (URL)</label>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Photo</label>
+                  <button
+                    type="button"
+                    disabled={saving || uploadingAvatar || !appUser?.id}
+                    onClick={() => avatarFileRef.current?.click()}
+                    className="w-full mb-3 flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-3 font-semibold text-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  >
+                    {uploadingAvatar ? (
+                      <>
+                        <span className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        Envoi…
+                      </>
+                    ) : (
+                      <>
+                        <ImageUp size={20} />
+                        Photothèque (galerie)
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-slate-500 mb-2">Ou colle une URL d’image :</p>
                   <input
                     value={editAvatar}
                     onChange={(e) => setEditAvatar(e.target.value)}
