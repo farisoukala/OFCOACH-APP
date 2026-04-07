@@ -1,19 +1,15 @@
 import { supabase } from '../lib/supabase';
+import { prepareAvatarFileForUpload } from '../lib/avatarUpload';
 import type { WorkoutSchedulePick } from '../lib/workoutPlanning';
 import type { MessageRow, PublicUserRow } from '../types/rows';
 
 const AVATAR_BUCKET = 'avatars';
-const AVATAR_MAX_BYTES = 2.5 * 1024 * 1024;
-const AVATAR_MIME: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-};
 
 /**
  * Envoie une image de photothèque vers Supabase Storage (bucket public `avatars`) et retourne l’URL publique.
  * Prérequis SQL : `supabase_migration_storage_avatars.sql` exécuté sur le projet.
  * Seul l’utilisateur connecté peut écrire dans le dossier `{son user id}/`.
+ * iPhone : conversion HEIC → JPEG et compression si besoin (`prepareAvatarFileForUpload`).
  */
 export async function uploadUserAvatarFile(userId: string, file: File): Promise<string> {
   const {
@@ -22,22 +18,9 @@ export async function uploadUserAvatarFile(userId: string, file: File): Promise<
   if (!session?.user?.id || session.user.id !== userId) {
     throw new Error('Tu dois être connecté pour changer ta photo.');
   }
-  let mime = (file.type || '').toLowerCase();
-  if (!mime) {
-    const n = file.name.toLowerCase();
-    if (n.endsWith('.jpg') || n.endsWith('.jpeg')) mime = 'image/jpeg';
-    else if (n.endsWith('.png')) mime = 'image/png';
-    else if (n.endsWith('.webp')) mime = 'image/webp';
-  }
-  if (!AVATAR_MIME[mime]) {
-    throw new Error('Format accepté : JPEG, PNG ou WebP.');
-  }
-  if (file.size > AVATAR_MAX_BYTES) {
-    throw new Error('Image trop lourde (max. 2,5 Mo).');
-  }
-  const ext = AVATAR_MIME[mime];
+  const { file: ready, mime, ext } = await prepareAvatarFileForUpload(file);
   const path = `${userId}/avatar.${ext}`;
-  const { error: upErr } = await supabase.storage.from(AVATAR_BUCKET).upload(path, file, {
+  const { error: upErr } = await supabase.storage.from(AVATAR_BUCKET).upload(path, ready, {
     upsert: true,
     cacheControl: '3600',
     contentType: mime,

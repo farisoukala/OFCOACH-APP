@@ -241,7 +241,7 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
         <input
           ref={avatarFileRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+          accept="image/*"
           className="sr-only"
           aria-hidden
           onChange={(ev) => void handleAvatarFileChange(ev)}
