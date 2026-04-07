@@ -18,12 +18,12 @@ export async function uploadUserAvatarFile(userId: string, file: File): Promise<
   if (!session?.user?.id || session.user.id !== userId) {
     throw new Error('Tu dois être connecté pour changer ta photo.');
   }
-  const { file: ready, mime, ext } = await prepareAvatarFileForUpload(file);
-  const path = `${userId}/avatar.${ext}`;
+  const { file: ready } = await prepareAvatarFileForUpload(file);
+  const path = `${userId}/avatar.jpg`;
   const { error: upErr } = await supabase.storage.from(AVATAR_BUCKET).upload(path, ready, {
     upsert: true,
     cacheControl: '3600',
-    contentType: mime,
+    contentType: 'image/jpeg',
   });
   if (upErr) throw upErr;
   const { data: pub } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);

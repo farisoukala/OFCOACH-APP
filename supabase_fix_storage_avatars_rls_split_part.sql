@@ -1,27 +1,8 @@
 -- ============================================================
--- OfCoach – Stockage des photos de profil (avatars)
--- Bucket public + RLS : chaque utilisateur ne peut écrire que dans {auth.uid()}/*
--- Exécuter dans Supabase → SQL Editor (une fois par projet)
+-- OfCoach – Corrige RLS Storage avatars (2e changement de photo)
+-- Remplace storage.foldername(name) par split_part (plus fiable selon environnements).
+-- Exécuter dans Supabase → SQL Editor après supabase_migration_storage_avatars.sql
 -- ============================================================
-
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'avatars',
-  'avatars',
-  true,
-  2621440,
-  ARRAY['image/jpeg', 'image/png', 'image/webp']::text[]
-)
-ON CONFLICT (id) DO UPDATE SET
-  public = EXCLUDED.public,
-  file_size_limit = EXCLUDED.file_size_limit,
-  allowed_mime_types = EXCLUDED.allowed_mime_types;
-
--- Lecture publique (URL affichée dans l’app sans jeton)
-DROP POLICY IF EXISTS "Avatars public read" ON storage.objects;
-CREATE POLICY "Avatars public read"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'avatars');
 
 DROP POLICY IF EXISTS "Avatars insert own folder" ON storage.objects;
 CREATE POLICY "Avatars insert own folder"

@@ -112,9 +112,17 @@ export async function prepareAvatarFileForUpload(file: File): Promise<{ file: Fi
     mime = 'image/jpeg';
   }
 
-  const ext = ALLOWED[mime];
+  let ext = ALLOWED[mime];
   if (!ext) {
     throw new Error('Format accepté : JPEG, PNG ou WebP.');
+  }
+
+  // Un seul chemin Storage par utilisateur : `{userId}/avatar.jpg` — évite les échecs RLS au 2e envoi
+  // quand l’extension changeait (jpg puis png) et créait un nouvel objet.
+  if (ext !== 'jpg') {
+    working = await fileToJpegViaCanvas(working);
+    mime = 'image/jpeg';
+    ext = 'jpg';
   }
 
   return { file: working, mime, ext };
