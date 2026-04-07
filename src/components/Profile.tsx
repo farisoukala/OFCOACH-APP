@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   User,
   Settings,
@@ -28,6 +28,9 @@ import {
 } from '../lib/browserNotifications';
 
 const defaultAvatar = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=200&auto=format&fit=crop';
+
+/** iOS Safari bloque souvent `input.click()` depuis un bouton ; un `<label htmlFor>` natif ouvre bien la photothèque. */
+const AVATAR_FILE_INPUT_ID = 'ofcoach-profile-avatar-file';
 
 interface ProfileProps {
   onBack?: () => void;
@@ -66,7 +69,6 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
   const [passwordFieldErrors, setPasswordFieldErrors] = useState<{ current?: string; new?: string; confirm?: string }>({});
   const [browserNotifyPerm, setBrowserNotifyPerm] = useState(() => getBrowserNotificationSupport());
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const avatarFileRef = useRef<HTMLInputElement>(null);
 
   const [tailleCm, setTailleCm] = useState<string>('');
   const [tourPoitrineCm, setTourPoitrineCm] = useState<string>('');
@@ -238,12 +240,14 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
       )}
 
       <div className="flex flex-col items-center pt-4">
+        {/* Un seul input ; les <label htmlFor> (icône + modal) déclenchent la photothèque sans .click() — requis sur iPhone */}
         <input
-          ref={avatarFileRef}
+          id={AVATAR_FILE_INPUT_ID}
           type="file"
           accept="image/*"
+          disabled={uploadingAvatar || saving || !appUser?.id}
           className="sr-only"
-          aria-hidden
+          aria-label="Choisir une photo de profil dans la photothèque"
           onChange={(ev) => void handleAvatarFileChange(ev)}
         />
         <div className="relative">
@@ -255,19 +259,19 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
               referrerPolicy="no-referrer"
             />
           </div>
-          <button
-            type="button"
-            disabled={uploadingAvatar}
-            onClick={() => avatarFileRef.current?.click()}
+          <label
+            htmlFor={AVATAR_FILE_INPUT_ID}
             title="Choisir une photo dans la photothèque"
-            className="absolute -bottom-2 -right-2 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg border-4 border-background-light dark:border-background-dark disabled:opacity-60"
+            className={`absolute -bottom-2 -right-2 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center shadow-lg border-4 border-background-light dark:border-background-dark touch-manipulation ${
+              uploadingAvatar || saving || !appUser?.id ? 'pointer-events-none opacity-60' : 'cursor-pointer active:scale-95'
+            }`}
           >
             {uploadingAvatar ? (
-              <span className="size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span className="pointer-events-none size-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <Camera size={18} />
+              <Camera className="pointer-events-none" size={18} aria-hidden />
             )}
-          </button>
+          </label>
         </div>
         <h2 className="mt-4 text-2xl font-bold text-slate-900 dark:text-white">{displayName}</h2>
         <p className="text-slate-500 dark:text-slate-400 text-sm">{appUser?.email}</p>
@@ -536,25 +540,25 @@ export const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateToNotificati
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Photo</label>
-                  <button
-                    type="button"
-                    disabled={saving || uploadingAvatar || !appUser?.id}
-                    onClick={() => avatarFileRef.current?.click()}
-                    className="w-full mb-3 flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-3 font-semibold text-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  <span className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Photo</span>
+                  <label
+                    htmlFor={AVATAR_FILE_INPUT_ID}
+                    className={`w-full mb-3 flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-xl px-4 py-3 font-semibold text-primary hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors touch-manipulation ${
+                      saving || uploadingAvatar || !appUser?.id ? 'pointer-events-none opacity-50' : 'cursor-pointer active:scale-[0.99]'
+                    }`}
                   >
                     {uploadingAvatar ? (
                       <>
-                        <span className="size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                        <span className="pointer-events-none size-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                         Envoi…
                       </>
                     ) : (
                       <>
-                        <ImageUp size={20} />
+                        <ImageUp className="pointer-events-none shrink-0" size={20} aria-hidden />
                         Photothèque (galerie)
                       </>
                     )}
-                  </button>
+                  </label>
                   <p className="text-[11px] text-slate-500 mb-2">Ou colle une URL d’image :</p>
                   <input
                     value={editAvatar}
